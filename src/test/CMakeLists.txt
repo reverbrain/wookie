@@ -1,0 +1,2 @@
+add_executable(wookie_stem_test stem_test.cpp)
+target_link_libraries(wookie_stem_test wookie_stem)
