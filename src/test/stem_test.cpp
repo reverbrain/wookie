@@ -16,17 +16,7 @@ int main(int argc, char *argv[])
 
 		std::cin >> word;
 
-		std::cout << ">> " << word;
-		while (true) {
-			std::string tmp = s.get(word.data(), word.size());
-
-			if (tmp == word)
-				break;
-
-			word = tmp;
-			std::cout << " -> " << tmp;
-		}
-		std::cout << std::endl;
+		std::cout << ">> " << word << " -> " << s.get(word.data(), word.size()) << std::endl;
 	}
 
 	return 0;
