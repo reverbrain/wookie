@@ -39,10 +39,12 @@ class split {
 				token = boost::locale::to_lower(token);
 
 				const char *lang = lang_detect(token.data(), token.size());
+
 				mstem_t::iterator stem_it = stems.find(lang);
 				if (stem_it == stems.end()) {
 					boost::shared_ptr<stem> st(new stem(lang, NULL));
 					stems.insert(std::make_pair(lang, st));
+
 					token = st->get(token.data(), token.size());
 				} else {
 					token = stem_it->second->get(token.data(), token.size());
