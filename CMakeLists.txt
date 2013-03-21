@@ -19,8 +19,8 @@ find_package(compact-language-detector-devel REQUIRED)
 FILE(GLOB headers
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/stem/include/stem/*.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/stem/include/stem/*.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/stem/include/stem/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/stem/include/stem/*.h"
 )
 install(FILES ${headers} DESTINATION include/wookie)
 
@@ -29,8 +29,10 @@ include_directories(${PROJECT_SOURCE_DIR}
 	${PROJECT_BINARY_DIR}
 	"${PROJECT_SOURCE_DIR}/include"
 	${cld_INCLUDE_DIRS}
-	"${PROJECT_SOURCE_DIR}/src/stem/include"
-	"${PROJECT_SOURCE_DIR}/src/stem/libstemmer_c/include"
+	"${PROJECT_SOURCE_DIR}/stem/include"
+	"${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include"
 )
 
-add_subdirectory(src)
+add_subdirectory(stem)
+add_subdirectory(grape)
+add_subdirectory(test)
