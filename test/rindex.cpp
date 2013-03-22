@@ -19,14 +19,16 @@ class wookie_storage : public ioremap::elliptics::node {
 			m_groups = groups;
 		}
 
-		void process(const std::string &file) {
+		void process_file(const std::string &file) {
 			std::ifstream in(file.c_str());
-
 			std::ostringstream ss;
-
 			ss << in.rdbuf();
 
-			wookie::mpos_t pos = m_spl.feed(ss.str());
+			process(ss.str());
+		}
+
+		void process(const std::string &data) {
+			wookie::mpos_t pos = m_spl.feed(data);
 			for (auto p : pos) {
 				std::cout << p.first << " : " << p.second.size() << std::endl;
 			}
@@ -84,5 +86,5 @@ int main(int argc, char *argv[])
 
 
 	st.set_groups(groups);
-	st.process(file);
+	st.process_file(file);
 }
