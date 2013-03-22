@@ -38,6 +38,9 @@ class split {
 				std::string token = it->data();
 				token = boost::locale::to_lower(token);
 
+				if (!token.size())
+					continue;
+
 				const char *lang = lang_detect(token.data(), token.size());
 
 				mstem_t::iterator stem_it = stems.find(lang);
@@ -109,7 +112,7 @@ class split {
 
 };
 
-static const std::string split::m_split_string(" \t.,:;=+()[]{}\\|?<>!#%^&*_~`'\"\n\r");
+const std::string split::m_split_string(" \t.,:;=+()[]{}\\|?<>!#%^&*_~`'\"\n\r");
 
 }}
 
