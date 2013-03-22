@@ -16,8 +16,11 @@ class stem {
 	public:
 		stem(const char *lang, const char *enc) {
 			m_stem = sb_stemmer_new(lang, enc);
-			if (!m_stem)
-				throw std::bad_alloc();
+			if (!m_stem) {
+				m_stem = sb_stemmer_new("eng", enc);
+				if (!m_stem)
+					throw std::bad_alloc();
+			}
 		}
 
 		~stem() {
