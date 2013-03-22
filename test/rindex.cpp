@@ -34,7 +34,7 @@ class wookie_storage : public ioremap::elliptics::node {
 
 	private:
 		std::vector<int> m_groups;
-		ioremap::wookie::split m_spl;
+		wookie::split m_spl;
 };
 
 int main(int argc, char *argv[])
