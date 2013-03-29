@@ -12,6 +12,11 @@
 #include <boost/program_options.hpp>
 
 #define EV_MULTIPLICITY 1
+#define EV_MINIMAL       0
+#define EV_USE_MONOTONIC 1
+#define EV_USE_REALTIME  1
+#define EV_USE_NANOSLEEP 1
+#define EV_USE_EVENTFD   1
 #include <ev++.h>
 
 #include <swarm/networkmanager.h>
@@ -63,38 +68,20 @@ class storage : public elliptics::node {
 		wookie::split m_spl;
 };
 
-class download {
+class downloader {
 	public:
-		download() :  m_async(m_loop), m_manager(m_loop), m_thread(std::bind(&download::crawl, this)) {
+		downloader() :  m_async(m_loop), m_manager(m_loop), m_thread(std::bind(&downloader::crawl, this)) {
+			std::cout << "created new downloader object" << std::endl;
 		}
 
-		~download() {
+		~downloader() {
 			m_async.send();
 			m_thread.join();
 		}
 
-		void feed(const std::string &url, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
-			ioremap::swarm::network_url url_parser;
-			url_parser.set_base(url);
-			std::string normalized_url = url_parser.normalized();
-			if (normalized_url.empty())
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': can not be normilized");
-
-			ioremap::swarm::network_request request;
-			request.follow_location = true;
-			request.url = normalized_url;
-
+		void enqueue(const ioremap::swarm::network_request &request,
+				const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
 			m_manager.get(handler, request);
-		}
-
-		void url_complete(const ioremap::swarm::network_reply &reply) {
-			std::cout << "url: " << reply.url <<
-				", code: " << reply.code <<
-				", error: " << reply.error <<
-				", data-size: " << reply.data.size() <<
-				std::endl;
-			for (auto h : reply.headers)
-				std::cout << h.first << " : " << h.second << std::endl;
 		}
 
 	private:
@@ -108,17 +95,67 @@ class download {
 		std::vector<std::shared_ptr<ev::async>> m_async_crawl;
 
 		void crawl() {
-			m_manager.set_limit(10); /* number of active connections */
-
-			m_async.set<download, &download::crawl_stop>(this);
+			m_async.set<downloader, &downloader::crawl_stop>(this);
 			m_async.start();
+
+			m_manager.set_limit(10); /* number of active connections */
 
 			std::cout << "thread started: " << syscall(SYS_gettid) << std::endl;
 			m_loop.loop();
 		}
 
 		void crawl_stop(ev::async &aio, int) {
+			std::cout << "async message received" << std::endl;
 			aio.loop.unloop();
+		}
+};
+
+class process {
+	public:
+		process(int tnum) : m_signal(m_loop), m_downloaders(tnum) {
+			m_signal.set<process, &process::signal_received>(this);
+			m_signal.start(SIGTERM);
+
+			srand(time(NULL));
+		}
+
+		void start(void) {
+			m_loop.loop();
+		}
+
+		void feed(const std::string &url, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
+			ioremap::swarm::network_url url_parser;
+			url_parser.set_base(url);
+			std::string normalized_url = url_parser.normalized();
+			if (normalized_url.empty())
+				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': can not be normilized");
+
+			ioremap::swarm::network_request request;
+			request.follow_location = true;
+			request.url = normalized_url;
+
+			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
+		}
+
+		void url_complete(const ioremap::swarm::network_reply &reply) {
+			std::cout << "url: " << reply.url <<
+				", code: " << reply.code <<
+				", error: " << reply.error <<
+				", data-size: " << reply.data.size() <<
+				std::endl;
+			for (auto h : reply.headers)
+				std::cout << h.first << " : " << h.second << std::endl;
+		}
+
+
+	private:
+		ev::default_loop	m_loop;
+		ev::sig			m_signal;
+		std::vector<wookie::downloader>	m_downloaders;
+
+		void signal_received(ev::sig &sig, int rev) {
+			std::cout << "received signal: " << rev << std::endl;
+			sig.loop.break_loop();
 		}
 };
 
@@ -162,7 +199,6 @@ int main(int argc, char *argv[])
 	if (!vm.count("key"))
 		key = file;
 
-
 	elliptics::file_logger log(log_file.c_str(), log_level);
 	wookie::storage st(log);
 
@@ -177,11 +213,10 @@ int main(int argc, char *argv[])
 	std::locale loc=gen("en_US.UTF8"); 
 	std::locale::global(loc);
 
-
 	st.set_groups(groups);
 	st.process_file(key, file);
 
-	wookie::download d;
-	d.feed(url, std::bind(&wookie::download::url_complete, &d, std::placeholders::_1));
-	sleep(10);
+	wookie::process p(3);
+	p.feed(url, std::bind(&wookie::process::url_complete, &p, std::placeholders::_1));
+	p.start();
 }
