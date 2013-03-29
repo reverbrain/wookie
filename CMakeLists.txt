@@ -16,6 +16,10 @@ find_package(grape REQUIRED)
 find_package(msgpack REQUIRED)
 find_package(compact-language-detector-devel REQUIRED)
 
+INCLUDE(cmake/locate_library.cmake)
+LOCATE_LIBRARY(SWARM "networkmanager.h" "swarm" "swarm")
+LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
+
 FILE(GLOB headers
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.h"
@@ -25,6 +29,8 @@ FILE(GLOB headers
 install(FILES ${headers} DESTINATION include/wookie)
 
 include_directories(${PROJECT_SOURCE_DIR}
+	${LIBEV_INCLUDE_DIRS}	
+	${SWARM_INCLUDE_DIRS}
 	${grape_INCLUDE_DIRS}
 	${PROJECT_BINARY_DIR}
 	"${PROJECT_SOURCE_DIR}/include"
@@ -33,6 +39,16 @@ include_directories(${PROJECT_SOURCE_DIR}
 	"${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include"
 )
 
+link_directories(
+	${LIBEV_LIBRARY_DIRS}	
+	${SWARM_LIBRARY_DIRS}
+	${grape_LIBRARY_DIRS}
+	${cld_LIBRARY_DIRS}
+)
+
 add_subdirectory(stem)
+
+# only enabled for C++
+add_definitions(-std=c++0x)
 add_subdirectory(grape)
 add_subdirectory(test)

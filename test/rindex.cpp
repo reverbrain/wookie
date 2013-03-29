@@ -1,43 +1,128 @@
+#include <sys/types.h>
+#include <sys/syscall.h>
+
+#include <unistd.h>
+
 #include <fstream>
 #include <vector>
 #include <sstream>
+#include <thread>
+#include <atomic>
 
 #include <boost/program_options.hpp>
 
-#include "wookie/split.hpp"
+#define EV_MULTIPLICITY 1
+#include <ev++.h>
+
+#include <swarm/networkmanager.h>
+#include <swarm/url_finder.h>
+#include <swarm/network_url.h>
+
 #include <elliptics/cppdef.h>
 
-using namespace ioremap;
-namespace ell = ioremap::elliptics;
+#include "wookie/split.hpp"
 
-class wookie_storage : public ioremap::elliptics::node {
+using namespace ioremap;
+
+namespace ioremap { namespace wookie {
+
+class storage : public elliptics::node {
 	public:
-		explicit wookie_storage(ell::logger &log) : node(log) {
+		explicit storage(elliptics::logger &log) : elliptics::node(log) {
 		}
 
 		void set_groups(const std::vector<int> groups) {
 			m_groups = groups;
 		}
 
-		void process_file(const std::string &file) {
+		void process_file(const std::string &key, const std::string &file) {
 			std::ifstream in(file.c_str());
 			std::ostringstream ss;
 			ss << in.rdbuf();
 
-			process(ss.str());
+			process(key, ss.str());
 		}
 
-		void process(const std::string &data) {
+		void process(const std::string &key, const std::string &data) {
 			wookie::mpos_t pos = m_spl.feed(data);
+
+			elliptics::session s(*this);
+			s.set_groups(m_groups);
+
+			std::vector<std::string> ids;
 			for (auto p : pos) {
-				std::cout << p.first << " : " << p.second.size() << std::endl;
+				ids.push_back(p.first);
 			}
+
+			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
+			s.update_indexes(key, ids);
 		}
 
 	private:
 		std::vector<int> m_groups;
 		wookie::split m_spl;
 };
+
+class download {
+	public:
+		download() :  m_async(m_loop), m_manager(m_loop), m_thread(std::bind(&download::crawl, this)) {
+		}
+
+		~download() {
+			m_async.send();
+			m_thread.join();
+		}
+
+		void feed(const std::string &url, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
+			ioremap::swarm::network_url url_parser;
+			url_parser.set_base(url);
+			std::string normalized_url = url_parser.normalized();
+			if (normalized_url.empty())
+				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': can not be normilized");
+
+			ioremap::swarm::network_request request;
+			request.follow_location = true;
+			request.url = normalized_url;
+
+			m_manager.get(handler, request);
+		}
+
+		void url_complete(const ioremap::swarm::network_reply &reply) {
+			std::cout << "url: " << reply.url <<
+				", code: " << reply.code <<
+				", error: " << reply.error <<
+				", data-size: " << reply.data.size() <<
+				std::endl;
+			for (auto h : reply.headers)
+				std::cout << h.first << " : " << h.second << std::endl;
+		}
+
+	private:
+		ev::dynamic_loop	m_loop;
+		ev::async		m_async;
+		ioremap::swarm::network_manager m_manager;
+		std::thread		m_thread;
+
+		std::atomic_long m_counter, m_prev_counter;
+		std::shared_ptr<ev::async> m_async_exit;
+		std::vector<std::shared_ptr<ev::async>> m_async_crawl;
+
+		void crawl() {
+			m_manager.set_limit(10); /* number of active connections */
+
+			m_async.set<download, &download::crawl_stop>(this);
+			m_async.start();
+
+			std::cout << "thread started: " << syscall(SYS_gettid) << std::endl;
+			m_loop.loop();
+		}
+
+		void crawl_stop(ev::async &aio, int) {
+			aio.loop.unloop();
+		}
+};
+
+}} /* namespace ioremap::wookie */
 
 int main(int argc, char *argv[])
 {
@@ -50,14 +135,17 @@ int main(int argc, char *argv[])
 	int log_level;
 	std::string file;
 	std::string remote;
+	std::string key;
 
 	desc.add_options()
 		("help", "This help message")
 		("log-file", po::value<std::string>(&log_file)->default_value("/dev/stdout"), "Log file")
 		("log-level", po::value<int>(&log_level)->default_value(DNET_LOG_INFO), "Log level")
 		("groups", po::value<std::vector<int> >(&groups), "Groups which will host indexes and data, format: 1:2:3")
-		("file", po::value<std::string>(&file), "Input text file")
-		("remote", po::value<std::string>(&remote), "Remote node to connect, format: address:port:family (IPv4 - 2, IPv6 - 10)")
+		("file", po::value<std::string>(&file)->required(), "Input text file")
+		("key", po::value<std::string>(&key), "Which key should be used to store given file into storage")
+		("remote", po::value<std::string>(&remote)->required(),
+		 	"Remote node to connect, format: address:port:family (IPv4 - 2, IPv6 - 10)")
 	;
 
 	po::variables_map vm;
@@ -69,13 +157,16 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	if (!vm.count("key"))
+		key = file;
 
-	ell::file_logger log(log_file.c_str(), log_level);
-	wookie_storage st(log);
+
+	elliptics::file_logger log(log_file.c_str(), log_level);
+	wookie::storage st(log);
 
 	try {
 		st.add_remote(remote.c_str());
-	} catch (const ell::error &e) {
+	} catch (const elliptics::error &e) {
 		std::cerr << "Could not connect to " << remote << ": " << e.what() << std::endl;
 		return -1;
 	}
@@ -86,5 +177,8 @@ int main(int argc, char *argv[])
 
 
 	st.set_groups(groups);
-	st.process_file(file);
+	st.process_file(key, file);
+
+	wookie::download d;
+	d.feed("http://company.yandex.ru", std::bind(&wookie::download::url_complete, &d, std::placeholders::_1));
 }
