@@ -1,0 +1,31 @@
+Wookie is a simple but quite powerful realtime search engine.
+
+It works with data you write into elliptics which eliminates need
+for separate setup of the external solution.
+Wookie is created on top of Grape [1] realtime pipeline engine in elliptics [2].
+
+It supports full-featured attribute search without relevance calculation,
+but with simple API to build your own ranking mechanism.
+Even more, one can create personalized attribute parsing which are not limited
+by string/integer calculus.
+
+Wookie is the realtime search engine which works with data you want to store
+in elliptics, this means that after your data has been stored, it is guaranteed
+that it will appear in the search indexes.
+
+Wookie supports language detection and simple morphology.
+
+This project was created to simplify decision for projects which want not only
+to store data, but also to perform its processing. We created Grape realtime
+processing engine for this purpose and Wookie search engine is a nice example
+of how simple it is to work with it.
+
+Links.
+1. Grape - realtime pipeline processing framework
+http://www.reverbrain.com/grape/
+
+2. Elliptics - distributed storage
+http://www.reverbrain.com/elliptics/
+
+3. Google group
+https://groups.google.com/forum/?fromgroups=#!forum/reverbrain
