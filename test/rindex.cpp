@@ -136,6 +136,7 @@ int main(int argc, char *argv[])
 	std::string file;
 	std::string remote;
 	std::string key;
+	std::string url;
 
 	desc.add_options()
 		("help", "This help message")
@@ -144,6 +145,7 @@ int main(int argc, char *argv[])
 		("groups", po::value<std::vector<int> >(&groups), "Groups which will host indexes and data, format: 1:2:3")
 		("file", po::value<std::string>(&file)->required(), "Input text file")
 		("key", po::value<std::string>(&key), "Which key should be used to store given file into storage")
+		("url", po::value<std::string>(&url)->required(), "Url to download")
 		("remote", po::value<std::string>(&remote)->required(),
 		 	"Remote node to connect, format: address:port:family (IPv4 - 2, IPv6 - 10)")
 	;
@@ -180,5 +182,6 @@ int main(int argc, char *argv[])
 	st.process_file(key, file);
 
 	wookie::download d;
-	d.feed("http://company.yandex.ru", std::bind(&wookie::download::url_complete, &d, std::placeholders::_1));
+	d.feed(url, std::bind(&wookie::download::url_complete, &d, std::placeholders::_1));
+	sleep(10);
 }
