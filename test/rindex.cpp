@@ -323,8 +323,6 @@ class recursor {
 					break;
 
 				for (auto url : p.urls()) {
-					if (url.compare(0, 2, "//") == 0)
-						continue;
 					if (url.compare(0, 7, "mailto:") == 0)
 						continue;
 
