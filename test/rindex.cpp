@@ -329,6 +329,8 @@ class recursor {
 				for (auto url : p.urls()) {
 					if (url.compare(0, 7, "mailto:") == 0)
 						continue;
+					if (url.compare(0, 4, "ftp:") == 0)
+						continue;
 
 					std::string host;
 					std::string request_url = received_url.relative(url, &host);
