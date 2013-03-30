@@ -3,11 +3,15 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <fstream>
 #include <functional>
+#include <iostream>
+#include <iterator>
 #include <sstream>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -360,6 +364,7 @@ int main(int argc, char *argv[])
 
 	int groups_array[] = {1, 2, 3};
 	std::vector<int> groups(groups_array, groups_array + ARRAY_SIZE(groups_array));
+	std::string group_string;
 	std::string log_file;
 	int log_level;
 	std::string file;
@@ -371,7 +376,7 @@ int main(int argc, char *argv[])
 		("help", "This help message")
 		("log-file", po::value<std::string>(&log_file)->default_value("/dev/stdout"), "Log file")
 		("log-level", po::value<int>(&log_level)->default_value(DNET_LOG_INFO), "Log level")
-		("groups", po::value<std::vector<int> >(&groups), "Groups which will host indexes and data, format: 1:2:3")
+		("groups", po::value<std::string>(&group_string), "Groups which will host indexes and data, format: 1:2:3")
 		("file", po::value<std::string>(&file)->required(), "Input text file")
 		("key", po::value<std::string>(&key), "Which key should be used to store given file into storage")
 		("url", po::value<std::string>(&url)->required(), "Url to download")
@@ -390,6 +395,20 @@ int main(int argc, char *argv[])
 
 	if (!vm.count("key"))
 		key = file;
+
+	if (group_string.size()) {
+		struct digitizer {
+			int operator() (const std::string &str) {
+				return atoi(str.c_str());
+			}
+		};
+
+		groups.clear();
+
+		std::istringstream iss(group_string);
+		std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
+				std::back_inserter<std::vector<int>>(groups), digitizer());
+	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
 	wookie::storage st(log);
