@@ -68,7 +68,7 @@ class storage : public elliptics::node {
 			}
 
 			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
-			s.update_indexes(key, ids);
+			//s.update_indexes(key, ids);
 		}
 
 	private:
@@ -274,8 +274,8 @@ namespace url {
 
 class recursor {
 	public:
-		recursor(const std::string &url, const url::recursion recursion, dmanager &d) :
-		m_recursion(recursion), m_dmanager(d), m_downloaded(0) {
+		recursor(const std::string &url, dmanager &d, const std::function<std::vector<std::string>(const std::string &, parser &)> &handler):
+		m_dmanager(d), m_downloaded(0), m_handler(handler) {
 			ioremap::swarm::network_url base_url;
 
 			if (!base_url.set_base(url))
@@ -291,11 +291,10 @@ class recursor {
 	private:
 		std::string m_base;
 
-		url::recursion m_recursion;
 		dmanager &m_dmanager;
-		std::mutex m_processed_lock;
-		std::set<std::string> m_processed;
 		std::atomic_long m_downloaded;
+
+		std::function<std::vector<std::string>(const std::string &, parser &)> m_handler;
 
 		void process_reply(const ioremap::swarm::network_reply &reply) {
 			m_downloaded++;
@@ -309,23 +308,44 @@ class recursor {
 				", data-size: " << reply.data.size() <<
 				", urls: " << p.urls().size() <<
 				", token strings: " << p.tokens().size() <<
-				", requested urls: " << m_processed.size() <<
 				", downloaded urls: " << m_downloaded <<
 				std::endl;
 			for (auto h : reply.headers)
 				std::cout << h.first << " : " << h.second << std::endl;
 
+			std::vector<std::string> urls = m_handler(reply.url, p);
+
+			for (auto url : urls) {
+				m_dmanager.feed(url, std::bind(&recursor::process_reply, this, std::placeholders::_1));
+			}
+		}
+
+};
+
+}} /* namespace ioremap::wookie */
+
+class rindex_test_url_handler {
+	public:
+		rindex_test_url_handler(ioremap::wookie::url::recursion rec) : m_recursion(rec) {
+		}
+
+		std::vector<std::string> process_url(const std::string &orig_url, ioremap::wookie::parser &p) {
+			std::vector<std::string> reply_urls;
+
+			std::cout << "starting processing " << orig_url << std::endl;
+			if (m_recursion == ioremap::wookie::url::none)
+				return reply_urls;
+
+			ioremap::swarm::network_url received_url;
+			if (!received_url.set_base(orig_url))
+				throw ioremap::elliptics::error(-EINVAL, "Could not set network-url-base for orig URL '" + orig_url + "'");
+
+			std::string base = received_url.host();
+
 			switch (m_recursion) {
-			case url::none:
-				return;
-
-			case url::full:
-			case url::within_domain: {
-            			ioremap::swarm::network_url received_url;
-
-				if (!received_url.set_base(reply.url))
-					break;
-
+			case ioremap::wookie::url::none: /* can not be here */
+			case ioremap::wookie::url::full:
+			case ioremap::wookie::url::within_domain:
 				for (auto url : p.urls()) {
 					if (url.compare(0, 7, "mailto:") == 0)
 						continue;
@@ -338,7 +358,7 @@ class recursor {
 					if (request_url.empty() || host.empty())
 						continue;
 
-					if ((m_recursion == url::within_domain) && (host != m_base))
+					if ((m_recursion == ioremap::wookie::url::within_domain) && (host != base))
 						continue;
 
 					{
@@ -347,17 +367,24 @@ class recursor {
 							continue;
 
 						m_processed.insert(request_url);
-
-						m_dmanager.feed(request_url, std::bind(&recursor::process_reply, this, std::placeholders::_1));
 					}
-				}
+
+					reply_urls.push_back(request_url);
 				}
 			}
+
+			return reply_urls;
 		}
 
-};
+	private:
+		ioremap::wookie::url::recursion m_recursion;
 
-}} /* namespace ioremap::wookie */
+		/* this should be stored in external storage and checked there instead of local set of processed urls */
+		std::mutex m_processed_lock;
+		std::set<std::string> m_processed;
+
+		rindex_test_url_handler(const rindex_test_url_handler&);
+};
 
 int main(int argc, char *argv[])
 {
@@ -412,6 +439,15 @@ int main(int argc, char *argv[])
 				std::back_inserter<std::vector<int>>(groups), digitizer());
 	}
 
+	wookie::dmanager process(3);
+
+	rindex_test_url_handler rtest(wookie::url::within_domain);
+	wookie::recursor rec(url, process, std::bind(&rindex_test_url_handler::process_url, &rtest, std::placeholders::_1, std::placeholders::_2));
+	//wookie::recursor rec(url, process, rtest);
+
+	process.start();
+	return 0;
+
 	elliptics::file_logger log(log_file.c_str(), log_level);
 	wookie::storage st(log);
 
@@ -429,8 +465,4 @@ int main(int argc, char *argv[])
 	st.set_groups(groups);
 	st.process_file(key, file);
 
-	wookie::dmanager process(3);
-	wookie::recursor rec(url, wookie::url::within_domain, process);
-
-	process.start();
 }
