@@ -276,21 +276,10 @@ class recursor {
 	public:
 		recursor(const std::string &url, dmanager &d, const std::function<std::vector<std::string>(const std::string &, parser &)> &handler):
 		m_dmanager(d), m_downloaded(0), m_handler(handler) {
-			ioremap::swarm::network_url base_url;
-
-			if (!base_url.set_base(url))
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': set-base failed");
-
-			m_base = base_url.host();
-			if (m_base.empty())
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': base is empty");
-
 			m_dmanager.feed(url, std::bind(&recursor::process_reply, this, std::placeholders::_1));
 		}
 
 	private:
-		std::string m_base;
-
 		dmanager &m_dmanager;
 		std::atomic_long m_downloaded;
 
@@ -326,7 +315,15 @@ class recursor {
 
 class rindex_test_url_handler {
 	public:
-		rindex_test_url_handler(ioremap::wookie::url::recursion rec) : m_recursion(rec) {
+		rindex_test_url_handler(const std::string &url, ioremap::wookie::url::recursion rec) : m_recursion(rec) {
+			ioremap::swarm::network_url base_url;
+
+			if (!base_url.set_base(url))
+				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': set-base failed");
+
+			m_base = base_url.host();
+			if (m_base.empty())
+				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': base is empty");
 		}
 
 		std::vector<std::string> process_url(const std::string &orig_url, ioremap::wookie::parser &p) {
@@ -339,8 +336,6 @@ class rindex_test_url_handler {
 			ioremap::swarm::network_url received_url;
 			if (!received_url.set_base(orig_url))
 				throw ioremap::elliptics::error(-EINVAL, "Could not set network-url-base for orig URL '" + orig_url + "'");
-
-			std::string base = received_url.host();
 
 			switch (m_recursion) {
 			case ioremap::wookie::url::none: /* can not be here */
@@ -358,7 +353,7 @@ class rindex_test_url_handler {
 					if (request_url.empty() || host.empty())
 						continue;
 
-					if ((m_recursion == ioremap::wookie::url::within_domain) && (host != base))
+					if ((m_recursion == ioremap::wookie::url::within_domain) && (host != m_base))
 						continue;
 
 					{
@@ -377,6 +372,7 @@ class rindex_test_url_handler {
 		}
 
 	private:
+		std::string m_base;
 		ioremap::wookie::url::recursion m_recursion;
 
 		/* this should be stored in external storage and checked there instead of local set of processed urls */
@@ -441,9 +437,8 @@ int main(int argc, char *argv[])
 
 	wookie::dmanager process(3);
 
-	rindex_test_url_handler rtest(wookie::url::within_domain);
+	rindex_test_url_handler rtest(url, wookie::url::within_domain);
 	wookie::recursor rec(url, process, std::bind(&rindex_test_url_handler::process_url, &rtest, std::placeholders::_1, std::placeholders::_2));
-	//wookie::recursor rec(url, process, rtest);
 
 	process.start();
 	return 0;
