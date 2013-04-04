@@ -34,6 +34,7 @@
 #include <elliptics/cppdef.h>
 
 #include "wookie/split.hpp"
+#include "wookie/document.hpp"
 
 using namespace ioremap;
 
@@ -69,6 +70,22 @@ class storage : public elliptics::node {
 
 			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
 			//s.update_indexes(key, ids);
+		}
+
+		elliptics::async_write_result write_document(ioremap::wookie::document &d) {
+			msgpack::sbuffer buffer;
+			msgpack::pack(&buffer, d);
+
+			elliptics::session s(*this);
+			s.set_groups(m_groups);
+			return s.write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
+		}
+
+		elliptics::async_read_result read_data(const std::string &key) {
+			elliptics::session s(*this);
+			s.set_groups(m_groups);
+			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
+			return s.read_data(key, 0, 0);
 		}
 
 	private:
@@ -107,7 +124,6 @@ class downloader {
 
 			m_manager.set_limit(10); /* number of active connections */
 
-			std::cout << "thread started: " << syscall(SYS_gettid) << std::endl;
 			m_loop.loop();
 		}
 
@@ -272,50 +288,15 @@ namespace url {
 	};
 }
 
-class recursor {
-	public:
-		recursor(const std::string &url, dmanager &d, const std::function<std::vector<std::string>(const std::string &, parser &)> &handler):
-		m_dmanager(d), m_downloaded(0), m_handler(handler) {
-			m_dmanager.feed(url, std::bind(&recursor::process_reply, this, std::placeholders::_1));
-		}
-
-	private:
-		dmanager &m_dmanager;
-		std::atomic_long m_downloaded;
-
-		std::function<std::vector<std::string>(const std::string &, parser &)> m_handler;
-
-		void process_reply(const ioremap::swarm::network_reply &reply) {
-			m_downloaded++;
-
-			parser p;
-			p.parse(reply.data);
-
-			std::cout << "url: " << reply.url <<
-				", code: " << reply.code <<
-				", error: " << reply.error <<
-				", data-size: " << reply.data.size() <<
-				", urls: " << p.urls().size() <<
-				", token strings: " << p.tokens().size() <<
-				", downloaded urls: " << m_downloaded <<
-				std::endl;
-			for (auto h : reply.headers)
-				std::cout << h.first << " : " << h.second << std::endl;
-
-			std::vector<std::string> urls = m_handler(reply.url, p);
-
-			for (auto url : urls) {
-				m_dmanager.feed(url, std::bind(&recursor::process_reply, this, std::placeholders::_1));
-			}
-		}
-
-};
-
 }} /* namespace ioremap::wookie */
 
-class rindex_test_url_handler {
+class url_processor {
 	public:
-		rindex_test_url_handler(const std::string &url, ioremap::wookie::url::recursion rec) : m_recursion(rec) {
+		url_processor(const std::string &url, ioremap::wookie::url::recursion rec,
+				ioremap::wookie::storage &st, ioremap::wookie::dmanager &dm) :
+		m_recursion(rec),
+		m_st(st),
+		m_dm(dm) {
 			ioremap::swarm::network_url base_url;
 
 			if (!base_url.set_base(url))
@@ -324,18 +305,42 @@ class rindex_test_url_handler {
 			m_base = base_url.host();
 			if (m_base.empty())
 				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': base is empty");
+
+			download(url);
 		}
 
-		std::vector<std::string> process_url(const std::string &orig_url, ioremap::wookie::parser &p) {
-			std::vector<std::string> reply_urls;
+	private:
+		std::string m_base;
+		ioremap::wookie::url::recursion m_recursion;
 
-			std::cout << "starting processing " << orig_url << std::endl;
+		ioremap::wookie::storage &m_st;
+		ioremap::wookie::dmanager &m_dm;
+
+		url_processor(const url_processor &);
+
+		void download(const std::string &url) {
+			std::cout << "Downloading ... " << url << std::endl;
+			m_dm.feed(url, std::bind(&url_processor::process_url, this, std::placeholders::_1));
+		}
+
+		void process_url(const ioremap::swarm::network_reply &reply) {
+			wookie::parser p;
+			p.parse(reply.data);
+
+			wookie::document d;
+			dnet_current_time(&d.ts);
+			d.key = reply.url;
+			d.data = reply.data;
+
+			auto result = m_st.write_document(d);
+
+			std::cout << "Processing  ... " << reply.url << std::endl;
 			if (m_recursion == ioremap::wookie::url::none)
-				return reply_urls;
+				return;
 
 			ioremap::swarm::network_url received_url;
-			if (!received_url.set_base(orig_url))
-				throw ioremap::elliptics::error(-EINVAL, "Could not set network-url-base for orig URL '" + orig_url + "'");
+			if (!received_url.set_base(reply.url))
+				throw ioremap::elliptics::error(-EINVAL, "Could not set network-url-base for orig URL '" + reply.url + "'");
 
 			switch (m_recursion) {
 			case ioremap::wookie::url::none: /* can not be here */
@@ -356,30 +361,20 @@ class rindex_test_url_handler {
 					if ((m_recursion == ioremap::wookie::url::within_domain) && (host != m_base))
 						continue;
 
-					{
-						std::lock_guard<std::mutex> guard(m_processed_lock);
-						if (m_processed.find(request_url) != m_processed.end())
-							continue;
-
-						m_processed.insert(request_url);
+					try {
+						auto rres = m_st.read_data(request_url);
+						rres.wait();
+						if (rres.error()) {
+							std::cout << std::endl << request_url << ": err: " << rres.error() << ", code: " << rres.error().code() << std::endl;
+							download(request_url);
+						}
+					} catch (const std::exception &e) {
+						std::cerr << "exception: " << e.what() << std::endl;
 					}
-
-					reply_urls.push_back(request_url);
 				}
 			}
-
-			return reply_urls;
 		}
 
-	private:
-		std::string m_base;
-		ioremap::wookie::url::recursion m_recursion;
-
-		/* this should be stored in external storage and checked there instead of local set of processed urls */
-		std::mutex m_processed_lock;
-		std::set<std::string> m_processed;
-
-		rindex_test_url_handler(const rindex_test_url_handler&);
 };
 
 int main(int argc, char *argv[])
@@ -435,14 +430,6 @@ int main(int argc, char *argv[])
 				std::back_inserter<std::vector<int>>(groups), digitizer());
 	}
 
-	wookie::dmanager process(3);
-
-	rindex_test_url_handler rtest(url, wookie::url::within_domain);
-	wookie::recursor rec(url, process, std::bind(&rindex_test_url_handler::process_url, &rtest, std::placeholders::_1, std::placeholders::_2));
-
-	process.start();
-	return 0;
-
 	elliptics::file_logger log(log_file.c_str(), log_level);
 	wookie::storage st(log);
 
@@ -458,6 +445,11 @@ int main(int argc, char *argv[])
 	std::locale::global(loc);
 
 	st.set_groups(groups);
-	st.process_file(key, file);
+	wookie::dmanager downloader(1);
+
+	url_processor rtest(url, wookie::url::within_domain, st, downloader);
+
+	downloader.start();
+	return 0;
 
 }
