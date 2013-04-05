@@ -77,6 +77,7 @@ class storage : public elliptics::node {
 			msgpack::pack(&buffer, d);
 
 			elliptics::session s(*this);
+			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
 			s.set_groups(m_groups);
 			return s.write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
 		}
@@ -348,41 +349,48 @@ class url_processor {
 			}
 		}
 
-		void process_url(const ioremap::swarm::network_reply &reply) {
-			wookie::parser p;
-			p.parse(reply.data);
+		ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content) {
+			infligt_erase(url);
 
 			wookie::document d;
 			dnet_current_time(&d.ts);
-			d.key = reply.url;
-			d.data = reply.data;
+			d.key = url;
+			d.data = content;
 
-			infligt_erase(reply.url);
+			return m_st.write_document(d);
+		}
 
-			auto result = m_st.write_document(d);
+		void process_url(const ioremap::swarm::network_reply &reply) {
+			std::list<ioremap::elliptics::async_write_result> res;
 
-			std::cout << "Processing  ... " << reply.url << ", headers: " << reply.headers.size() << std::endl;
+			res.emplace_back(store_document(reply.url, reply.data));
+			if (reply.url != reply.request.url)
+				res.emplace_back(store_document(reply.request.url, std::string()));
+
+			wookie::parser p;
+			p.parse(reply.data);
+
+			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
+				", headers: " << reply.headers.size() << std::endl;
 			for (auto h : reply.headers)
-				std::cout << "  " << h.first << " : " << h.second << std::endl;
+				std::cout << "  " << h.first << " : " << h.second;
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
 
 			ioremap::swarm::network_url received_url;
 			if (!received_url.set_base(reply.url))
-				throw ioremap::elliptics::error(-EINVAL, "Could not set network-url-base for orig URL '" + reply.url + "'");
+				ioremap::elliptics::throw_error(-EINVAL, "Could not set network-url-base for orig URL '%s'", reply.url.c_str());
 
 			switch (m_recursion) {
 			case ioremap::wookie::url::none: /* can not be here */
 			case ioremap::wookie::url::full:
 			case ioremap::wookie::url::within_domain:
-				for (auto url : p.urls()) {
-					if (url.compare(0, 7, "mailto:") == 0)
-						continue;
-					if (url.compare(0, 4, "ftp:") == 0)
-						continue;
-
+				for (auto && url : p.urls()) {
 					std::string host;
 					std::string request_url = received_url.relative(url, &host);
+
+					if ((request_url.compare(0, 6, "https:") != 0) && (request_url.compare(0, 5, "http:") != 0))
+						continue;
 
 					if (request_url.empty() || host.empty() || (request_url == reply.url))
 						continue;
@@ -405,6 +413,9 @@ class url_processor {
 					}
 				}
 			}
+
+			for (auto && r : res)
+				r.wait();
 		}
 };
 
