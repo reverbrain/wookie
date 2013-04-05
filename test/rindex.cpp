@@ -64,7 +64,7 @@ class storage : public elliptics::node {
 			s.set_groups(m_groups);
 
 			std::vector<std::string> ids;
-			for (auto p : pos) {
+			for (auto && p : pos) {
 				ids.push_back(p.first);
 			}
 
@@ -194,14 +194,14 @@ class parser {
 			static std::string bad_elements[] = {"script", "style"};
 			static std::string good_elements[] = {"body"};
 
-			for (auto bad : bad_elements) {
+			for (auto && bad : bad_elements) {
 				if (strcasecmp(tag, bad.c_str()) == 0) {
 					m_process_flag -= offset;
 					return;
 				}
 			}
 
-			for (auto good : good_elements) {
+			for (auto && good : good_elements) {
 				if (strcasecmp(tag, good.c_str()) == 0) {
 					m_process_flag += offset;
 					return;
@@ -372,7 +372,7 @@ class url_processor {
 
 			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
 				", headers: " << reply.headers.size() << std::endl;
-			for (auto h : reply.headers)
+			for (auto && h : reply.headers)
 				std::cout << "  " << h.first << " : " << h.second;
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
