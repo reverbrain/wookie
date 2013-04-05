@@ -316,11 +316,36 @@ class url_processor {
 		ioremap::wookie::storage &m_st;
 		ioremap::wookie::dmanager &m_dm;
 
+		std::mutex m_inflight_lock;
+		std::set<std::string> m_inflight;
+
 		url_processor(const url_processor &);
 
 		void download(const std::string &url) {
 			std::cout << "Downloading ... " << url << std::endl;
 			m_dm.feed(url, std::bind(&url_processor::process_url, this, std::placeholders::_1));
+		}
+
+		bool inflight_insert(const std::string &url) {
+			std::unique_lock<std::mutex> guard(m_inflight_lock);
+
+			auto check = m_inflight.find(url);
+			if (check == m_inflight.end()) {
+				m_inflight.insert(url);
+				//std::cout << "Inserting ... " << url << std::endl;
+				return true;
+			}
+
+			return false;
+		}
+
+		void infligt_erase(const std::string &url) {
+			std::unique_lock<std::mutex> guard(m_inflight_lock);
+			auto check = m_inflight.find(url);
+			if (check != m_inflight.end()) {
+				m_inflight.erase(check);
+				//std::cout << "Erasing ... " << url << std::endl;
+			}
 		}
 
 		void process_url(const ioremap::swarm::network_reply &reply) {
@@ -332,9 +357,13 @@ class url_processor {
 			d.key = reply.url;
 			d.data = reply.data;
 
+			infligt_erase(reply.url);
+
 			auto result = m_st.write_document(d);
 
-			std::cout << "Processing  ... " << reply.url << std::endl;
+			std::cout << "Processing  ... " << reply.url << ", headers: " << reply.headers.size() << std::endl;
+			for (auto h : reply.headers)
+				std::cout << "  " << h.first << " : " << h.second << std::endl;
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
 
@@ -355,26 +384,28 @@ class url_processor {
 					std::string host;
 					std::string request_url = received_url.relative(url, &host);
 
-					if (request_url.empty() || host.empty())
+					if (request_url.empty() || host.empty() || (request_url == reply.url))
 						continue;
 
 					if ((m_recursion == ioremap::wookie::url::within_domain) && (host != m_base))
 						continue;
 
-					try {
-						auto rres = m_st.read_data(request_url);
-						rres.wait();
-						if (rres.error()) {
-							std::cout << std::endl << request_url << ": err: " << rres.error() << ", code: " << rres.error().code() << std::endl;
-							download(request_url);
-						}
-					} catch (const std::exception &e) {
-						std::cerr << "exception: " << e.what() << std::endl;
+					if (!inflight_insert(request_url))
+						continue;
+
+					auto rres = m_st.read_data(request_url);
+					rres.wait();
+					if (rres.error()) {
+						std::cout << request_url <<
+							": err: " << rres.error() <<
+							", code: " << rres.error().code() << std::endl;
+						download(request_url);
+					} else {
+						infligt_erase(request_url);
 					}
 				}
 			}
 		}
-
 };
 
 int main(int argc, char *argv[])
