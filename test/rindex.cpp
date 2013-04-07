@@ -262,7 +262,7 @@ class dmanager {
 			url_parser.set_base(url);
 			std::string normalized_url = url_parser.normalized();
 			if (normalized_url.empty())
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': can not be normilized");
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
 
 			ioremap::swarm::network_request request;
 			request.follow_location = true;
@@ -301,11 +301,11 @@ class url_processor {
 			ioremap::swarm::network_url base_url;
 
 			if (!base_url.set_base(url))
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': set-base failed");
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': set-base failed", url.c_str());
 
 			m_base = base_url.host();
 			if (m_base.empty())
-				throw ioremap::elliptics::error(-EINVAL, "Invalid URL '" + url + "': base is empty");
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '': base is empty", url.c_str());
 
 			download(url);
 		}
