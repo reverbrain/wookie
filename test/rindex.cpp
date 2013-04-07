@@ -333,7 +333,6 @@ class url_processor {
 			auto check = m_inflight.find(url);
 			if (check == m_inflight.end()) {
 				m_inflight.insert(url);
-				//std::cout << "Inserting ... " << url << std::endl;
 				return true;
 			}
 
@@ -345,7 +344,6 @@ class url_processor {
 			auto check = m_inflight.find(url);
 			if (check != m_inflight.end()) {
 				m_inflight.erase(check);
-				//std::cout << "Erasing ... " << url << std::endl;
 			}
 		}
 
@@ -361,6 +359,11 @@ class url_processor {
 		}
 
 		void process_url(const ioremap::swarm::network_reply &reply) {
+			if (reply.error) {
+				std::cout << "Error ... " << reply.url << ": " << reply.error << std::endl;
+				return;
+			}
+
 			std::list<ioremap::elliptics::async_write_result> res;
 
 			res.emplace_back(store_document(reply.url, reply.data));
