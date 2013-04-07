@@ -19,12 +19,12 @@
 
 #include <libxml/HTMLparser.h>
 
-#define EV_MULTIPLICITY 1
-#define EV_MINIMAL       0
-#define EV_USE_MONOTONIC 1
-#define EV_USE_REALTIME  1
-#define EV_USE_NANOSLEEP 1
-#define EV_USE_EVENTFD   1
+#define EV_MULTIPLICITY		1
+#define EV_MINIMAL		0
+#define EV_USE_MONOTONIC	1
+#define EV_USE_REALTIME		1
+#define EV_USE_NANOSLEEP	1
+#define EV_USE_EVENTFD		1
 #include <ev++.h>
 
 #include <swarm/networkmanager.h>
