@@ -364,6 +364,11 @@ class url_processor {
 				return;
 			}
 
+			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
+				", headers: " << reply.headers.size() << std::endl;
+			for (auto && h : reply.headers)
+				std::cout << "  " << h.first << " : " << h.second;
+
 			std::list<ioremap::elliptics::async_write_result> res;
 
 			res.emplace_back(store_document(reply.url, reply.data));
@@ -373,10 +378,6 @@ class url_processor {
 			wookie::parser p;
 			p.parse(reply.data);
 
-			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
-				", headers: " << reply.headers.size() << std::endl;
-			for (auto && h : reply.headers)
-				std::cout << "  " << h.first << " : " << h.second;
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
 
