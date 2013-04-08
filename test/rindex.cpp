@@ -32,9 +32,11 @@
 #include <swarm/network_url.h>
 
 #include <elliptics/cppdef.h>
+#include <elliptics/session_indexes.hpp>
 
 #include "wookie/split.hpp"
 #include "wookie/document.hpp"
+#include "wookie/index_data.hpp"
 
 using namespace ioremap;
 
@@ -42,7 +44,9 @@ namespace ioremap { namespace wookie {
 
 class storage : public elliptics::node {
 	public:
-		explicit storage(elliptics::logger &log) : elliptics::node(log) {
+		explicit storage(elliptics::logger &log, const std::string &ns) :
+		elliptics::node(log),
+       		m_namespace(ns) {
 		}
 
 		void set_groups(const std::vector<int> groups) {
@@ -54,22 +58,42 @@ class storage : public elliptics::node {
 			std::ostringstream ss;
 			ss << in.rdbuf();
 
-			process(key, ss.str());
+			dnet_time ts;
+			dnet_current_time(&ts);
+
+			process(key, ss.str(), ts);
 		}
 
-		void process(const std::string &key, const std::string &data) {
+		void process(const std::string &key, const std::string &data, const dnet_time &ts) {
 			wookie::mpos_t pos = m_spl.feed(data);
 
-			elliptics::session s(*this);
-			s.set_groups(m_groups);
-
 			std::vector<std::string> ids;
+			std::vector<elliptics::data_pointer> objs;
+
 			for (auto && p : pos) {
-				ids.push_back(p.first);
+				ids.emplace_back(std::move(p.first));
+				objs.emplace_back(index_data(ts, p.second).convert());
 			}
 
-			s.set_ioflags(DNET_IO_FLAGS_CACHE | DNET_IO_FLAGS_CACHE_ONLY);
-			//s.update_indexes(key, ids);
+			create_session().update_indexes(key, ids, objs);
+		}
+
+		void find(const std::vector<std::string> &indexes) {
+			std::vector<elliptics::find_indexes_result_entry> objs = create_session().find_indexes(indexes);
+
+			for (auto && entry : objs) {
+				std::cout << "find: " << entry << std::endl;
+			}
+		}
+
+		void find(const std::string &text) {
+			wookie::mpos_t pos = m_spl.feed(text);
+
+			std::vector<std::string> indexes;
+			std::transform(pos.begin(), pos.end(), std::back_inserter(indexes),
+					std::bind(&mpos_t::value_type::first, std::placeholders::_1));
+
+			find(indexes);
 		}
 
 		elliptics::async_write_result write_document(ioremap::wookie::document &d) {
@@ -92,6 +116,20 @@ class storage : public elliptics::node {
 	private:
 		std::vector<int> m_groups;
 		wookie::split m_spl;
+		std::string m_namespace;
+
+		elliptics::session create_session(void) {
+			elliptics::session s(*this);
+
+			s.set_groups(m_groups);
+
+			if (m_namespace.size())
+				s.set_namespace(m_namespace.c_str(), m_namespace.size());
+
+			s.set_ioflags(DNET_IO_FLAGS_CACHE);
+
+			return s;
+		}
 };
 
 class downloader {
@@ -159,8 +197,8 @@ class parser {
 			return m_urls;
 		}
 
-		std::vector<std::string> &tokens(void) {
-			return m_tokens;
+		const std::string text(void) const {
+			return m_text.str();
 		}
 
 
@@ -177,7 +215,7 @@ class parser {
 			if (m_process_flag <= 0)
 				return;
 
-			m_tokens.emplace_back(reinterpret_cast<const char *>(ch), len);
+			m_text.write(reinterpret_cast<const char *>(ch), len);
 		}
 
 		void parser_end_element(const xmlChar *tag_name) {
@@ -187,7 +225,7 @@ class parser {
 
 	private:
 		std::vector<std::string> m_urls;
-		std::vector<std::string> m_tokens;
+		std::ostringstream m_text;
 		int m_process_flag;
 
 		void update_process_flag(const char *tag, int offset) {
@@ -305,7 +343,7 @@ class url_processor {
 
 			m_base = base_url.host();
 			if (m_base.empty())
-				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '': base is empty", url.c_str());
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': base is empty", url.c_str());
 
 			download(url);
 		}
@@ -347,11 +385,11 @@ class url_processor {
 			}
 		}
 
-		ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content) {
+		ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content, const dnet_time &ts) {
 			infligt_erase(url);
 
 			wookie::document d;
-			dnet_current_time(&d.ts);
+			d.ts = ts;
 			d.key = url;
 			d.data = content;
 
@@ -365,18 +403,24 @@ class url_processor {
 			}
 
 			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
+				", data-size: " << reply.data.size() <<
 				", headers: " << reply.headers.size() << std::endl;
 			for (auto && h : reply.headers)
 				std::cout << "  " << h.first << " : " << h.second;
 
 			std::list<ioremap::elliptics::async_write_result> res;
 
-			res.emplace_back(store_document(reply.url, reply.data));
+			struct dnet_time ts;
+			dnet_current_time(&ts);
+
+			res.emplace_back(store_document(reply.url, reply.data, ts));
 			if (reply.url != reply.request.url)
-				res.emplace_back(store_document(reply.request.url, std::string()));
+				res.emplace_back(store_document(reply.request.url, std::string(), ts));
 
 			wookie::parser p;
 			p.parse(reply.data);
+
+			m_st.process(reply.url, p.text(), ts);
 
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
@@ -437,6 +481,8 @@ int main(int argc, char *argv[])
 	std::string remote;
 	std::string key;
 	std::string url;
+	std::string ns;
+	std::string find;
 
 	desc.add_options()
 		("help", "This help message")
@@ -446,6 +492,8 @@ int main(int argc, char *argv[])
 		("file", po::value<std::string>(&file)->required(), "Input text file")
 		("key", po::value<std::string>(&key), "Which key should be used to store given file into storage")
 		("url", po::value<std::string>(&url)->required(), "Url to download")
+		("namespace", po::value<std::string>(&ns), "Namespace for urls and indexes")
+		("find", po::value<std::string>(&find), "Find pages containing all tokens (space separated)")
 		("remote", po::value<std::string>(&remote)->required(),
 		 	"Remote node to connect, format: address:port:family (IPv4 - 2, IPv6 - 10)")
 	;
@@ -477,7 +525,7 @@ int main(int argc, char *argv[])
 	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
-	wookie::storage st(log);
+	wookie::storage st(log, ns);
 
 	try {
 		st.add_remote(remote.c_str());
@@ -491,11 +539,18 @@ int main(int argc, char *argv[])
 	std::locale::global(loc);
 
 	st.set_groups(groups);
-	wookie::dmanager downloader(1);
 
-	url_processor rtest(url, wookie::url::within_domain, st, downloader);
-
-	downloader.start();
+	try {
+		if (find.size()) {
+			st.find(find);
+		} else {
+			wookie::dmanager downloader(3);
+			url_processor rtest(url, wookie::url::within_domain, st, downloader);
+			downloader.start();
+		}
+	} catch (const std::exception &e) {
+		std::cerr << "main thread exception: " << e.what() << std::endl;
+	}
 	return 0;
 
 }

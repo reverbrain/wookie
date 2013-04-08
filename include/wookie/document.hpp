@@ -16,6 +16,10 @@ struct document {
 
 	std::string			key;
 	std::string			data;
+
+	enum {
+		version = 1,
+	};
 };
 
 }}
@@ -46,13 +50,22 @@ inline msgpack::packer<Stream> &operator <<(msgpack::packer<Stream> &o, const dn
 
 static inline ioremap::wookie::document &operator >>(msgpack::object o, ioremap::wookie::document &d)
 {
-	if (o.type != msgpack::type::ARRAY || o.via.array.size != 3)
-		throw msgpack::type_error();
+	if (o.type != msgpack::type::ARRAY || o.via.array.size != 4)
+		ioremap::elliptics::throw_error(-EPROTO, "msgpack: document array size mismatch: compiled: %d, unpacked: %d",
+				4, o.via.array.size);
 
 	object *p = o.via.array.ptr;
-	p[0].convert(&d.ts);
-	p[1].convert(&d.key);
-	p[2].convert(&d.data);
+
+	int version;
+	p[0].convert(&version);
+
+	if (version != ioremap::wookie::document::version)
+		ioremap::elliptics::throw_error(-EPROTO, "msgpack: document version mismatch: compiled: %d, unpacked: %d",
+				ioremap::wookie::document::version, version);
+
+	p[1].convert(&d.ts);
+	p[2].convert(&d.key);
+	p[3].convert(&d.data);
 
 	return d;
 }
@@ -60,7 +73,8 @@ static inline ioremap::wookie::document &operator >>(msgpack::object o, ioremap:
 template <typename Stream>
 static inline msgpack::packer<Stream> &operator <<(msgpack::packer<Stream> &o, const ioremap::wookie::document &d)
 {
-	o.pack_array(3);
+	o.pack_array(4);
+	o.pack(static_cast<int>(ioremap::wookie::document::version));
 	o.pack(d.ts);
 	o.pack(d.key);
 	o.pack(d.data);
