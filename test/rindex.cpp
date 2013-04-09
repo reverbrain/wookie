@@ -335,7 +335,8 @@ class url_processor {
 				ioremap::wookie::storage &st, ioremap::wookie::dmanager &dm) :
 		m_recursion(rec),
 		m_st(st),
-		m_dm(dm) {
+		m_dm(dm),
+       		m_total(0) {
 			ioremap::swarm::network_url base_url;
 
 			if (!base_url.set_base(url))
@@ -357,6 +358,8 @@ class url_processor {
 
 		std::mutex m_inflight_lock;
 		std::set<std::string> m_inflight;
+
+		std::atomic_long m_total;
 
 		url_processor(const url_processor &);
 
@@ -402,25 +405,36 @@ class url_processor {
 				return;
 			}
 
-			std::cout << "Processing  ... " << reply.request.url << " -> " << reply.url <<
+			std::cout << "Processing  ... " << reply.request.url;
+			if (reply.url != reply.request.url)
+				std::cout << " -> " << reply.url;
+
+			std::cout << ", total-urls: " << m_total <<
 				", data-size: " << reply.data.size() <<
 				", headers: " << reply.headers.size() << std::endl;
 			for (auto && h : reply.headers)
 				std::cout << "  " << h.first << " : " << h.second;
 
+			++m_total;
 			std::list<ioremap::elliptics::async_write_result> res;
 
 			struct dnet_time ts;
 			dnet_current_time(&ts);
 
+			wookie::parser p;
+			p.parse(reply.data);
+
+			try {
+				m_st.process(reply.url, p.text(), ts);
+			} catch (const std::exception &e) {
+				std::cerr << "index processing exception: " << e.what() << std::endl;
+				download(reply.request.url);
+			}
+
 			res.emplace_back(store_document(reply.url, reply.data, ts));
 			if (reply.url != reply.request.url)
 				res.emplace_back(store_document(reply.request.url, std::string(), ts));
 
-			wookie::parser p;
-			p.parse(reply.data);
-
-			m_st.process(reply.url, p.text(), ts);
 
 			if (m_recursion == ioremap::wookie::url::none)
 				return;
@@ -452,9 +466,6 @@ class url_processor {
 					auto rres = m_st.read_data(request_url);
 					rres.wait();
 					if (rres.error()) {
-						std::cout << request_url <<
-							": err: " << rres.error() <<
-							", code: " << rres.error().code() << std::endl;
 						download(request_url);
 					} else {
 						infligt_erase(request_url);
@@ -477,9 +488,7 @@ int main(int argc, char *argv[])
 	std::string group_string;
 	std::string log_file;
 	int log_level;
-	std::string file;
 	std::string remote;
-	std::string key;
 	std::string url;
 	std::string ns;
 	std::string find;
@@ -489,9 +498,7 @@ int main(int argc, char *argv[])
 		("log-file", po::value<std::string>(&log_file)->default_value("/dev/stdout"), "Log file")
 		("log-level", po::value<int>(&log_level)->default_value(DNET_LOG_INFO), "Log level")
 		("groups", po::value<std::string>(&group_string), "Groups which will host indexes and data, format: 1:2:3")
-		("file", po::value<std::string>(&file)->required(), "Input text file")
-		("key", po::value<std::string>(&key), "Which key should be used to store given file into storage")
-		("url", po::value<std::string>(&url)->required(), "Url to download")
+		("url", po::value<std::string>(&url), "Url to download")
 		("namespace", po::value<std::string>(&ns), "Namespace for urls and indexes")
 		("find", po::value<std::string>(&find), "Find pages containing all tokens (space separated)")
 		("remote", po::value<std::string>(&remote)->required(),
@@ -502,13 +509,15 @@ int main(int argc, char *argv[])
 	po::store(po::parse_command_line(argc, argv, desc), vm);
 	po::notify(vm);
 
-	if (vm.count("help") || !vm.count("file") || !vm.count("remote")) {
+	if (vm.count("help") || !vm.count("remote")) {
 		std::cerr << desc << std::endl;
 		return -1;
 	}
 
-	if (!vm.count("key"))
-		key = file;
+	if (!vm.count("find") && !vm.count("url")) {
+		std::cerr << "You must provide either URL or FIND option" << std::endl << desc << std::endl;
+		return -1;
+	}
 
 	if (group_string.size()) {
 		struct digitizer {
