@@ -127,6 +127,7 @@ class storage : public elliptics::node {
 				s.set_namespace(m_namespace.c_str(), m_namespace.size());
 
 			s.set_ioflags(DNET_IO_FLAGS_CACHE);
+			s.set_timeout(10);
 
 			return s;
 		}
@@ -427,7 +428,7 @@ class url_processor {
 			try {
 				m_st.process(reply.url, p.text(), ts);
 			} catch (const std::exception &e) {
-				std::cerr << "index processing exception: " << e.what() << std::endl;
+				std::cerr << reply.url << ": index processing exception: " << e.what() << std::endl;
 				download(reply.request.url);
 			}
 
