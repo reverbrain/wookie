@@ -33,7 +33,7 @@ static inline dnet_time &operator >>(msgpack::object o, dnet_time &tm)
 
 	object *p = o.via.array.ptr;
 	p[0].convert(&tm.tsec);
-	p[0].convert(&tm.tnsec);
+	p[1].convert(&tm.tnsec);
 
 	return tm;
 }
