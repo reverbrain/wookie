@@ -18,6 +18,7 @@ find_package(compact-language-detector-devel REQUIRED)
 
 INCLUDE(cmake/locate_library.cmake)
 LOCATE_LIBRARY(SWARM "networkmanager.h" "swarm" "swarm")
+LOCATE_LIBRARY(MSGPACK "msgpack.hpp" "msgpack")
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 LOCATE_LIBRARY(LIBXML2 "libxml/xpath.h" "xml2" "libxml2")
 
@@ -35,6 +36,7 @@ include_directories(${PROJECT_SOURCE_DIR}
 	${grape_INCLUDE_DIRS}
 	${PROJECT_BINARY_DIR}
 	${LIBXML2_INCLUDE_DIRS}
+	${MSGPACK_INCLUDE_DIRS}
 	"${PROJECT_SOURCE_DIR}/include"
 	${cld_INCLUDE_DIRS}
 	"${PROJECT_SOURCE_DIR}/stem/include"
@@ -46,7 +48,8 @@ link_directories(
 	${SWARM_LIBRARY_DIRS}
 	${grape_LIBRARY_DIRS}
 	${cld_LIBRARY_DIRS}
-	${LIBXML2_LIBRARY_DIRS}	
+	${LIBXML2_LIBRARY_DIRS}
+	${MSGPACK_INCLUDE_DIRS}
 )
 
 add_subdirectory(stem)

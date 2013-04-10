@@ -82,7 +82,11 @@ class storage : public elliptics::node {
 			std::vector<elliptics::find_indexes_result_entry> objs = create_session().find_indexes(indexes);
 
 			for (auto && entry : objs) {
-				std::cout << "find: " << entry << std::endl;
+				std::cout << "found document id: " << entry.id << std::endl;
+				for (auto index : entry.indexes) {
+					index_data id(index.second);
+					std::cout << "  token-id: " << index.first << ": " << id << std::endl;
+				}
 			}
 		}
 

@@ -34,6 +34,15 @@ struct index_data {
 	};
 };
 
+std::ostream &operator <<(std::ostream &out, const index_data &id)
+{
+	out << id.ts << ", positions in document: ";
+	for (auto p : id.pos)
+		out << p << " ";
+
+	return out;
+}
+
 }}; /* namespace ioremap::wookie */
 
 namespace msgpack {
