@@ -497,6 +497,7 @@ int main(int argc, char *argv[])
 	std::string url;
 	std::string ns;
 	std::string find;
+	int tnum;
 
 	desc.add_options()
 		("help", "This help message")
@@ -504,6 +505,7 @@ int main(int argc, char *argv[])
 		("log-level", po::value<int>(&log_level)->default_value(DNET_LOG_INFO), "Log level")
 		("groups", po::value<std::string>(&group_string), "Groups which will host indexes and data, format: 1:2:3")
 		("url", po::value<std::string>(&url), "Url to download")
+		("uthreads", po::value<int>(&tnum)->default_value(3), "Number of URL downloading and processing threads")
 		("namespace", po::value<std::string>(&ns), "Namespace for urls and indexes")
 		("find", po::value<std::string>(&find), "Find pages containing all tokens (space separated)")
 		("remote", po::value<std::string>(&remote)->required(),
@@ -558,7 +560,7 @@ int main(int argc, char *argv[])
 		if (find.size()) {
 			st.find(find);
 		} else {
-			wookie::dmanager downloader(3);
+			wookie::dmanager downloader(tnum);
 			url_processor rtest(url, wookie::url::within_domain, st, downloader);
 			downloader.start();
 		}
