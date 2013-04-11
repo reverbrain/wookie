@@ -429,9 +429,12 @@ class url_processor {
 			wookie::parser p;
 			p.parse(reply.data);
 
+			try {
 				m_st.process(reply.url, p.text(), ts);
-
-			return;
+			} catch (const std::exception &e) {
+				std::cerr << reply.url << ": index processing exception: " << e.what() << std::endl;
+				download(reply.request.url);
+			}
 
 			res.emplace_back(store_document(reply.url, reply.data, ts));
 			if (reply.url != reply.request.url)
