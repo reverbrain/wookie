@@ -1,9 +1,12 @@
 #ifndef __INDEX_DATA_HPP
 #define __INDEX_DATA_HPP
 
-#include <msgpack.hpp>
-
 #include "wookie/document.hpp"
+
+#include "elliptics/session_indexes.hpp"
+#include "elliptics/packet.h"
+
+#include <msgpack.hpp>
 
 namespace ioremap { namespace wookie {
 
@@ -34,7 +37,9 @@ struct index_data {
 	};
 };
 
-std::ostream &operator <<(std::ostream &out, const index_data &id)
+}}; /* namespace ioremap::wookie */
+
+std::ostream &operator <<(std::ostream &out, const ioremap::wookie::index_data &id)
 {
 	out << id.ts << ", positions in document: ";
 	for (auto p : id.pos)
@@ -42,8 +47,6 @@ std::ostream &operator <<(std::ostream &out, const index_data &id)
 
 	return out;
 }
-
-}}; /* namespace ioremap::wookie */
 
 namespace msgpack {
 static inline ioremap::wookie::index_data &operator >>(msgpack::object o, ioremap::wookie::index_data &d)
