@@ -26,7 +26,7 @@ typedef std::map<std::string, boost::shared_ptr<stem> > mstem_t;
 class split {
 	public:
 		split() {}
-		mpos_t feed(const std::string &text) {
+		mpos_t feed(const std::string &text, std::vector<std::string> &tokens) {
 			std::vector<std::string> strs;
 			boost::split(strs, text, boost::is_any_of(m_split_string));
 
@@ -61,6 +61,8 @@ class split {
 						std::vector<int> vec;
 						vec.push_back(pos);
 						mpos.insert(std::make_pair(token, vec));
+
+						tokens.push_back(token);
 					}
 				}
 
@@ -112,7 +114,7 @@ class split {
 
 };
 
-const std::string split::m_split_string(" \t.,:;=+()[]{}\\|?<>!#%^&*_~`'\"\n\r");
+const std::string split::m_split_string(" \t.,:;=+()[]{}\\|?<>!#%^&*_~`'\"-\n\r");
 
 }}
 
