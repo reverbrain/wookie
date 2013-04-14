@@ -30,17 +30,16 @@ FILE(GLOB headers
 )
 install(FILES ${headers} DESTINATION include/wookie)
 
-include_directories(${PROJECT_SOURCE_DIR}
+include_directories(${PROJECT_SOURCE_DIR}/include
 	${LIBEV_INCLUDE_DIRS}	
 	${SWARM_INCLUDE_DIRS}
 	${grape_INCLUDE_DIRS}
 	${PROJECT_BINARY_DIR}
 	${LIBXML2_INCLUDE_DIRS}
 	${MSGPACK_INCLUDE_DIRS}
-	"${PROJECT_SOURCE_DIR}/include"
 	${cld_INCLUDE_DIRS}
-	"${PROJECT_SOURCE_DIR}/stem/include"
-	"${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include"
+	${PROJECT_SOURCE_DIR}/stem/include
+	${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include
 )
 
 link_directories(
