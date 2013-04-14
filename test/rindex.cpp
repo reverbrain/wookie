@@ -78,26 +78,25 @@ class storage : public elliptics::node {
 			create_session().update_indexes(key, ids, objs);
 		}
 
-		void find(const std::vector<std::string> &indexes) {
+		void find(const std::vector<std::string> &indexes, std::vector<index_data> &results) {
 			std::vector<elliptics::find_indexes_result_entry> objs = create_session().find_indexes(indexes);
 
 			for (auto && entry : objs) {
 				std::cout << "found document id: " << entry.id << std::endl;
 				for (auto index : entry.indexes) {
-					index_data id(index.second);
-					std::cout << "  token-id: " << index.first << ": " << id << std::endl;
+					results.emplace_back(index.second);
 				}
 			}
 		}
 
-		void find(const std::string &text) {
+		void find(const std::string &text, std::vector<index_data> &results) {
 			wookie::mpos_t pos = m_spl.feed(text);
 
 			std::vector<std::string> indexes;
 			std::transform(pos.begin(), pos.end(), std::back_inserter(indexes),
 					std::bind(&mpos_t::value_type::first, std::placeholders::_1));
 
-			find(indexes);
+			find(indexes, results);
 		}
 
 		elliptics::async_write_result write_document(ioremap::wookie::document &d) {
@@ -558,7 +557,8 @@ int main(int argc, char *argv[])
 
 	try {
 		if (find.size()) {
-			st.find(find);
+			std::vector<ioremap::wookie::index_data> results;
+			st.find(find, results);
 		} else {
 			wookie::dmanager downloader(tnum);
 			url_processor rtest(url, wookie::url::within_domain, st, downloader);
