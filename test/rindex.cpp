@@ -82,8 +82,13 @@ int main(int argc, char *argv[])
 	try {
 		if (find.size()) {
 			ioremap::wookie::operators op(st);
-			std::vector<ioremap::wookie::index_data> results;
-			op.find(find, results);
+			std::vector<dnet_raw_id> results;
+			results = op.find(find);
+
+			std::cout << "Found documents: " << std::endl;
+			for (auto && r : results) {
+				std::cout << r << std::endl;
+			}
 		} else {
 			wookie::dmanager downloader(tnum);
 			wookie::url_processor rtest(url, wookie::url::within_domain, st, downloader);

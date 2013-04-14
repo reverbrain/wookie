@@ -3,6 +3,10 @@
 
 #include "wookie/index_data.hpp"
 
+#include "elliptics/session_indexes.hpp"
+
+#include <algorithm>
+
 namespace ioremap { namespace wookie {
 
 class operators {
@@ -11,29 +15,46 @@ class operators {
 		m_st(st) {
 		}
 
-		void find(const std::string &text, std::vector<index_data> &results) {
+		std::vector<dnet_raw_id> find(const std::string &text) {
 			operators_found scope = std::for_each(text.begin(), text.end(), operators_found());
+			std::vector<dnet_raw_id> results;
 
 			std::string nt(text);
 			for (auto op : scope.quotes) {
 				std::string quote = text.substr(op.first, op.second - op.first);
 				nt.replace(op.first, op.second - op.first, "");
 
-				std::cout << "quoted: " << quote << std::endl;
+				if (results.size() == 0)
+					results = find_quoted_chunk(quote);
+				else
+					results = intersect(results, find_quoted_chunk(quote));
 
-				find_quoted_chunk(quote);
 			}
+			if (results.size() == 0)
+				results = find_chunk(nt);
+			else
+				results = intersect(results, find_chunk(nt));
+			return results;
 		}
 
 	private:
 		storage &m_st;
 		wookie::split m_spl;
 
+		std::vector<dnet_raw_id> intersect(std::vector<dnet_raw_id> &results, const std::vector<dnet_raw_id> &tmp) {
+			std::vector<dnet_raw_id> ret;
+			auto it = std::set_intersection(results.begin(), results.end(), tmp.begin(), tmp.end(),
+					std::back_inserter(ret),
+					ioremap::elliptics::dnet_raw_id_less_than<ioremap::elliptics::skip_data>());
+
+			return std::move(ret);
+		}
+
 		std::vector<dnet_raw_id> document_ids(const std::vector<elliptics::find_indexes_result_entry> &objs) {
 			std::vector<dnet_raw_id> results;
 
 			for (auto && entry : objs) {
-				std::cout << "found document id: " << entry.id << std::endl;
+				//std::cout << "document id: " << entry.id << std::endl;
 				results.emplace_back(entry.id);
 			}
 
@@ -66,14 +87,10 @@ class operators {
 
 			std::vector<dnet_raw_id> results;
 			for (auto && entry : objs) {
-				std::cout << "found document id: " << entry.id << std::endl;
-
 				std::map<int, dnet_raw_id *> pos;
 
 				for (auto && index : entry.indexes) {
 					index_data idata(index.second);
-
-					std::cout << "  indexed token: " << index.first << ": " << idata << std::endl;
 
 					for (auto p : idata.pos)
 						pos.insert(std::make_pair(p, &index.first));
@@ -82,8 +99,10 @@ class operators {
 				int state = 0;
 				int prev_pos = -1;
 				for (auto p : pos) {
+#if 0
 					std::cout << "state: " << state << ", prev-pos: " << prev_pos << ", pos: " << p.first <<
 						", p-index: " << *p.second << ", should-be: " << id_indexes[state] << std::endl;
+#endif
 					if (state < (int)indexes.size()) {
 						if (!memcmp(p.second, &id_indexes[state], sizeof(struct dnet_raw_id))) {
 							if (prev_pos == -1) {
@@ -112,7 +131,7 @@ class operators {
 						prev_pos = -1;
 
 						results.push_back(entry.id);
-						std::cout << "good document id: " << entry.id << std::endl;
+						//std::cout << "good document id: " << entry.id << std::endl;
 						break;
 					}
 				}
