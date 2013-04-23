@@ -4,8 +4,9 @@
 #include "wookie/split.hpp"
 #include "wookie/index_data.hpp"
 
-#include <elliptics/cppdef.h>
-#include <elliptics/session_indexes.hpp>
+#include <elliptics/session.hpp>
+
+#include <fstream>
 
 namespace ioremap { namespace wookie {
 
@@ -58,17 +59,11 @@ class storage : public elliptics::node {
 			msgpack::sbuffer buffer;
 			msgpack::pack(&buffer, d);
 
-			elliptics::session s(*this);
-			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
-			s.set_groups(m_groups);
-			return s.write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
+			return create_session().write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
 		}
 
 		elliptics::async_read_result read_data(const std::string &key) {
-			elliptics::session s(*this);
-			s.set_groups(m_groups);
-			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
-			return s.read_data(key, 0, 0);
+			return create_session().read_data(key, 0, 0);
 		}
 
 		std::vector<dnet_raw_id> transform_tokens(const std::vector<std::string> &tokens) {
@@ -99,8 +94,9 @@ class storage : public elliptics::node {
 			if (m_namespace.size())
 				s.set_namespace(m_namespace.c_str(), m_namespace.size());
 
+			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
 			s.set_ioflags(DNET_IO_FLAGS_CACHE);
-			s.set_timeout(10);
+			s.set_timeout(1000);
 
 			return s;
 		}

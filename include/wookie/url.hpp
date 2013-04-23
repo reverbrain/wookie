@@ -4,6 +4,8 @@
 #include "wookie/dmanager.hpp"
 #include "wookie/parser.hpp"
 
+#include <mutex>
+
 namespace ioremap { namespace wookie {
 
 namespace url {
@@ -97,8 +99,6 @@ class url_processor {
 			std::cout << ", total-urls: " << m_total <<
 				", data-size: " << reply.data.size() <<
 				", headers: " << reply.headers.size() << std::endl;
-			for (auto && h : reply.headers)
-				std::cout << "  " << h.first << " : " << h.second;
 
 			++m_total;
 			std::list<ioremap::elliptics::async_write_result> res;

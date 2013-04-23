@@ -3,7 +3,9 @@
 
 #include "wookie/document.hpp"
 
-#include "elliptics/session_indexes.hpp"
+#include "elliptics/session.hpp"
+#include "elliptics/debug.hpp"
+
 #include "elliptics/packet.h"
 
 #include <msgpack.hpp>

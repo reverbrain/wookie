@@ -14,6 +14,7 @@
 #include <ev++.h>
 
 #include <atomic>
+#include <thread>
 
 namespace ioremap { namespace wookie {
 

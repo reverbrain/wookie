@@ -3,7 +3,7 @@
 
 #include "wookie/index_data.hpp"
 
-#include "elliptics/session_indexes.hpp"
+#include "elliptics/session.hpp"
 
 #include <algorithm>
 
@@ -43,7 +43,7 @@ class operators {
 
 		std::vector<dnet_raw_id> intersect(std::vector<dnet_raw_id> &results, const std::vector<dnet_raw_id> &tmp) {
 			std::vector<dnet_raw_id> ret;
-			auto it = std::set_intersection(results.begin(), results.end(), tmp.begin(), tmp.end(),
+			std::set_intersection(results.begin(), results.end(), tmp.begin(), tmp.end(),
 					std::back_inserter(ret),
 					ioremap::elliptics::dnet_raw_id_less_than<ioremap::elliptics::skip_data>());
 
