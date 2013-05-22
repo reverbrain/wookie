@@ -44,7 +44,7 @@ class storage : public elliptics::node {
 				objs.emplace_back(index_data(ts, p.second).convert());
 			}
 
-			create_session().update_indexes(key, ids, objs);
+			create_session().update_indexes(key, ids, objs).wait();
 		}
 
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<std::string> &indexes) {
@@ -94,8 +94,8 @@ class storage : public elliptics::node {
 			if (m_namespace.size())
 				s.set_namespace(m_namespace.c_str(), m_namespace.size());
 
-			s.set_exceptions_policy(elliptics::session::exceptions_policy::no_exceptions);
-			s.set_ioflags(DNET_IO_FLAGS_CACHE);
+			s.set_exceptions_policy(elliptics::session::no_exceptions);
+//			s.set_ioflags(DNET_IO_FLAGS_CACHE);
 			s.set_timeout(1000);
 
 			return s;
