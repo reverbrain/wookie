@@ -23,7 +23,7 @@ class url_processor {
 		m_recursion(rec),
 		m_st(st),
 		m_dm(dm),
-       		m_total(0) {
+		m_total(0) {
 			ioremap::swarm::network_url base_url;
 
 			if (!base_url.set_base(url))
@@ -151,7 +151,7 @@ class url_processor {
 					auto rres = m_st.read_data(request_url);
 					rres.wait();
 					if (rres.error()) {
-						std::cout << "Page cache: " << url << rres.error().message() << std::endl;
+						std::cout << "Page cache: " << request_url << " " << rres.error().message() << std::endl;
 						download(request_url);
 					} else {
 						infligt_erase(request_url);
@@ -159,8 +159,12 @@ class url_processor {
 				}
 			}
 
-			for (auto && r : res)
+			for (auto && r : res) {
 				r.wait();
+				if (r.error()) {
+					std::cout << "Document storage error: " << reply.request.url << " " << r.error().message() << std::endl;
+				}
+			}
 		}
 };
 
