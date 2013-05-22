@@ -151,6 +151,7 @@ class url_processor {
 					auto rres = m_st.read_data(request_url);
 					rres.wait();
 					if (rres.error()) {
+						std::cout << "Page cache: " << url << rres.error().message() << std::endl;
 						download(request_url);
 					} else {
 						infligt_erase(request_url);
