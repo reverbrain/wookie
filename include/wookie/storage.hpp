@@ -62,7 +62,7 @@ class storage : public elliptics::node {
 			return create_session().write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
 		}
 
-		elliptics::async_read_result read_data(const std::string &key) {
+		elliptics::async_read_result read_data(const elliptics::key &key) {
 			return create_session().read_data(key, 0, 0);
 		}
 
@@ -95,7 +95,7 @@ class storage : public elliptics::node {
 				s.set_namespace(m_namespace.c_str(), m_namespace.size());
 
 			s.set_exceptions_policy(elliptics::session::no_exceptions);
-//			s.set_ioflags(DNET_IO_FLAGS_CACHE);
+			s.set_ioflags(DNET_IO_FLAGS_CACHE);
 			s.set_timeout(1000);
 
 			return s;
