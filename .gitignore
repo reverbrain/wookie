@@ -11,7 +11,8 @@ Makefile
 *.o.*
 root/
 tags
-*.cmake
+cmake_install.cmake
+install_manifest.txt
 CMakeFiles
 CMakeCache.txt
 test/wookie_rindex_test
