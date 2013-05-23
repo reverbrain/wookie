@@ -12,4 +12,5 @@ target_link_libraries(wookie_rindex_test
 	${SWARM_LIBRARIES}
 	${LIBXML2_LIBRARIES}
 	${MSGPACK_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
 )

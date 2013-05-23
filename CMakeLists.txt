@@ -14,10 +14,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 find_package(Boost REQUIRED COMPONENTS system thread locale program_options)
 #find_package(grape REQUIRED)
 find_package(msgpack REQUIRED)
+find_package(elliptics REQUIRED)
 find_package(compact-language-detector-devel REQUIRED)
 
 INCLUDE(cmake/locate_library.cmake)
-LOCATE_LIBRARY(SWARM "networkmanager.h" "swarm" "swarm")
+LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
 LOCATE_LIBRARY(MSGPACK "msgpack.hpp" "msgpack")
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 LOCATE_LIBRARY(LIBXML2 "libxml/xpath.h" "xml2" "libxml2")
@@ -38,6 +39,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include
 	${LIBXML2_INCLUDE_DIRS}
 	${MSGPACK_INCLUDE_DIRS}
 	${cld_INCLUDE_DIRS}
+	${ELLIPTICS_INCLUDE_DIRS}
 	${PROJECT_SOURCE_DIR}/stem/include
 	${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include
 )
@@ -48,7 +50,7 @@ link_directories(
 	${grape_LIBRARY_DIRS}
 	${cld_LIBRARY_DIRS}
 	${LIBXML2_LIBRARY_DIRS}
-	${MSGPACK_INCLUDE_DIRS}
+	${MSGPACK_LIBRARY_DIRS}
 )
 
 add_subdirectory(stem)
