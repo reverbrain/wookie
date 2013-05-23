@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "-g -std=c++11 -W -Wall -Wextra -fstack-protector-all")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 find_package(Boost REQUIRED COMPONENTS system thread locale program_options)
-find_package(grape REQUIRED)
+#find_package(grape REQUIRED)
 find_package(msgpack REQUIRED)
 find_package(compact-language-detector-devel REQUIRED)
 
