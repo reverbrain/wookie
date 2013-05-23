@@ -4,7 +4,7 @@
 
 #include <msgpack.hpp>
 
-#include "elliptics/cppdef.h"
+#include <elliptics/cppdef.h>
 
 #ifndef __WOOKIE_DOCUMENT_HPP
 #define __WOOKIE_DOCUMENT_HPP
