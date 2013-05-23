@@ -41,7 +41,7 @@ class storage : public elliptics::node {
 
 			for (auto && p : pos) {
 				ids.emplace_back(std::move(p.first));
-				objs.emplace_back(index_data(ts, p.second).convert());
+				objs.emplace_back(index_data(ts, p.first, p.second).convert());
 			}
 
 			create_session().update_indexes(key, ids, objs);

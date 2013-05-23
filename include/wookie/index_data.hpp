@@ -14,10 +14,12 @@ namespace ioremap { namespace wookie {
 
 struct index_data {
 	dnet_time ts;
+	std::string key;
 	std::vector<int> pos;
 
-	index_data(const dnet_time &new_ts, std::vector<int> &new_pos) :
+	index_data(const dnet_time &new_ts, const std::string &new_key, std::vector<int> &new_pos) :
 	ts(new_ts),
+	key(new_key),
 	pos(new_pos) {
 	}
 
@@ -35,7 +37,7 @@ struct index_data {
 	}
 
 	enum {
-		version = 1,
+		version = 2,
 	};
 };
 
@@ -53,7 +55,7 @@ std::ostream &operator <<(std::ostream &out, const ioremap::wookie::index_data &
 namespace msgpack {
 static inline ioremap::wookie::index_data &operator >>(msgpack::object o, ioremap::wookie::index_data &d)
 {
-	if (o.type != msgpack::type::ARRAY || o.via.array.size != 3)
+	if (o.type != msgpack::type::ARRAY || o.via.array.size != 4)
 		ioremap::elliptics::throw_error(-EPROTO, "msgpack: index data array size mismatch: compiled: %d, unpacked: %d",
 				3, o.via.array.size);
 
@@ -68,6 +70,7 @@ static inline ioremap::wookie::index_data &operator >>(msgpack::object o, iorema
 
 	p[1].convert(&d.ts);
 	p[2].convert(&d.pos);
+	p[3].convert(&d.key);
 
 	return d;
 }
@@ -75,10 +78,11 @@ static inline ioremap::wookie::index_data &operator >>(msgpack::object o, iorema
 template <typename Stream>
 inline msgpack::packer<Stream> &operator <<(msgpack::packer<Stream> &o, const ioremap::wookie::index_data &d)
 {
-	o.pack_array(3);
+	o.pack_array(4);
 	o.pack(static_cast<int>(ioremap::wookie::index_data::version));
 	o.pack(d.ts);
 	o.pack(d.pos);
+	o.pack(d.key);
 
 	return o;
 }
