@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 		("uthreads", po::value<int>(&tnum)->default_value(3), "Number of URL downloading and processing threads")
 		("namespace", po::value<std::string>(&ns), "Namespace for urls and indexes")
 		("find", po::value<std::string>(&find), "Find pages containing all tokens (space separated)")
-		("remote", po::value<std::string>(&remote)->required(),
+		("remote", po::value<std::string>(&remote),
 		 	"Remote node to connect, format: address:port:family (IPv4 - 2, IPv6 - 10)")
 	;
 
