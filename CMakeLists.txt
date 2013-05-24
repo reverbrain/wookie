@@ -22,6 +22,7 @@ LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
 LOCATE_LIBRARY(MSGPACK "msgpack.hpp" "msgpack")
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 LOCATE_LIBRARY(LIBXML2 "libxml/xpath.h" "xml2" "libxml2")
+LOCATE_LIBRARY(LIBMAGIC "magic.h" "magic")
 
 FILE(GLOB headers
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.hpp"
@@ -42,6 +43,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include
 	${ELLIPTICS_INCLUDE_DIRS}
 	${PROJECT_SOURCE_DIR}/stem/include
 	${PROJECT_SOURCE_DIR}/stem/libstemmer_c/include
+	${LIBMAGIC_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -51,6 +53,7 @@ link_directories(
 	${cld_LIBRARY_DIRS}
 	${LIBXML2_LIBRARY_DIRS}
 	${MSGPACK_LIBRARY_DIRS}
+	${LIBMAGIC_LIBRARY_DIRS}
 )
 
 add_subdirectory(stem)

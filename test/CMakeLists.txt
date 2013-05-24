@@ -13,6 +13,7 @@ target_link_libraries(wookie_rindex_test
 	${LIBXML2_LIBRARIES}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
+	${LIBMAGIC_LIBRARIES}
 )
 
 add_executable(wookie_document_reader document_reader.cpp)

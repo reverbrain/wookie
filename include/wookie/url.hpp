@@ -6,6 +6,8 @@
 
 #include <mutex>
 
+#include <magic.h>
+
 namespace ioremap { namespace wookie {
 
 namespace url {
@@ -15,6 +17,40 @@ namespace url {
 		full
 	};
 }
+
+class magic {
+	public:
+		magic() {
+			m_magic = magic_open(MAGIC_MIME);
+			if (!m_magic)
+				ioremap::elliptics::throw_error(-ENOMEM, "Failed to create MIME magic handler");
+
+			if (magic_load(m_magic, 0) == -1) {
+				magic_close(m_magic);
+				ioremap::elliptics::throw_error(-ENOMEM, "Failed to load MIME magic database");
+			}
+		}
+
+		~magic() {
+			magic_close(m_magic);
+		}
+
+		const char *type(const char *buffer, size_t size) {
+			const char *ret = magic_buffer(m_magic, buffer, size);
+
+			if (!ret)
+				ret = "none";
+
+			return ret;
+		}
+
+		bool is_text(const char *buffer, size_t size) {
+			return !strncmp(type(buffer, size), "text/", 5);
+		}
+
+	private:
+		magic_t m_magic;
+};
 
 class url_processor {
 	public:
@@ -47,6 +83,8 @@ class url_processor {
 		std::set<std::string> m_inflight;
 
 		std::atomic_long m_total;
+
+		magic m_magic;
 
 		url_processor(const url_processor &);
 
@@ -86,26 +124,7 @@ class url_processor {
 			return m_st.write_document(d);
 		}
 
-		void process_url(const ioremap::swarm::network_reply &reply) {
-			if (reply.error) {
-				std::cout << "Error ... " << reply.url << ": " << reply.error << std::endl;
-				return;
-			}
-
-			std::cout << "Processing  ... " << reply.request.url;
-			if (reply.url != reply.request.url)
-				std::cout << " -> " << reply.url;
-
-			std::cout << ", total-urls: " << m_total <<
-				", data-size: " << reply.data.size() <<
-				", headers: " << reply.headers.size() << std::endl;
-
-			++m_total;
-			std::list<ioremap::elliptics::async_write_result> res;
-
-			struct dnet_time ts;
-			dnet_current_time(&ts);
-
+		void process_text(const ioremap::swarm::network_reply &reply, struct dnet_time &ts) {
 			wookie::parser p;
 			p.parse(reply.data);
 
@@ -115,10 +134,6 @@ class url_processor {
 				std::cerr << reply.url << ": index processing exception: " << e.what() << std::endl;
 				download(reply.request.url);
 			}
-
-			res.emplace_back(store_document(reply.url, reply.data, ts));
-			if (reply.url != reply.request.url)
-				res.emplace_back(store_document(reply.request.url, std::string(), ts));
 
 
 			if (m_recursion == url::none)
@@ -157,6 +172,52 @@ class url_processor {
 						infligt_erase(request_url);
 					}
 				}
+			}
+		}
+
+		void process_url(const ioremap::swarm::network_reply &reply) {
+			if (reply.error) {
+				std::cout << "Error ... " << reply.url << ": " << reply.error << std::endl;
+				return;
+			}
+
+			std::cout << "Processing  ... " << reply.request.url;
+			if (reply.url != reply.request.url)
+				std::cout << " -> " << reply.url;
+
+			std::cout << ", total-urls: " << m_total <<
+				", data-size: " << reply.data.size() <<
+				", headers: " << reply.headers.size() <<
+				std::endl;
+
+			bool text = false;
+			bool has_content_type = false;
+			for (auto h : reply.headers) {
+				if (h.first == "Content-Type") {
+					std::cout << h.second << std::endl;
+
+					text = !strncmp(h.second.c_str(), "text/", 5);
+					has_content_type = true;
+					break;
+				}
+			}
+
+			if (!has_content_type) {
+				text = m_magic.is_text(reply.data.c_str(), reply.data.size());
+			}
+
+			++m_total;
+			std::list<ioremap::elliptics::async_write_result> res;
+
+			struct dnet_time ts;
+			dnet_current_time(&ts);
+
+			res.emplace_back(store_document(reply.url, reply.data, ts));
+			if (reply.url != reply.request.url)
+				res.emplace_back(store_document(reply.request.url, std::string(), ts));
+
+			if (text) {
+				process_text(reply, ts);
 			}
 
 			for (auto && r : res) {
