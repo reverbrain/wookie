@@ -213,8 +213,10 @@ class url_processor {
 			dnet_current_time(&ts);
 
 			res.emplace_back(store_document(reply.url, reply.data, ts));
-			if (reply.url != reply.request.url)
+			if (reply.url != reply.request.url) {
 				res.emplace_back(store_document(reply.request.url, reply.url, ts));
+				m_st.process(reply.request.url, std::string(), ts, m_base + ".collection");
+			}
 
 			if (text) {
 				process_text(reply, ts);
