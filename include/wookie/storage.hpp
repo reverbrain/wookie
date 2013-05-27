@@ -29,22 +29,39 @@ class storage : public elliptics::node {
 			dnet_time ts;
 			dnet_current_time(&ts);
 
-			process(key, ss.str(), ts);
+			process(key, ss.str(), ts, std::string());
 		}
 
-		void process(const std::string &key, const std::string &data, const dnet_time &ts) {
-			std::vector<std::string> tokens;
-			wookie::mpos_t pos = m_spl.feed(data, tokens);
-
+		void process(const std::string &key, const std::string &data, const dnet_time &ts, const std::string &base_index) {
 			std::vector<std::string> ids;
 			std::vector<elliptics::data_pointer> objs;
 
-			for (auto && p : pos) {
-				ids.emplace_back(std::move(p.first));
-				objs.emplace_back(index_data(ts, p.first, p.second).convert());
+			if (data.size()) {
+				std::vector<std::string> tokens;
+				wookie::mpos_t pos = m_spl.feed(data, tokens);
+
+				for (auto && p : pos) {
+					ids.emplace_back(std::move(p.first));
+					objs.emplace_back(index_data(ts, p.first, p.second).convert());
+				}
 			}
 
-			create_session().update_indexes(key, ids, objs).wait();
+			if (base_index.size()) {
+				document doc;
+				doc.ts = ts;
+				doc.key = key;
+				doc.data = key;
+
+				msgpack::sbuffer doc_buffer;
+				msgpack::pack(&doc_buffer, doc);
+
+				ids.push_back(base_index);
+				objs.emplace_back(elliptics::data_pointer::copy(doc_buffer.data(), doc_buffer.size()));
+			}
+
+			if (ids.size()) {
+				create_session().update_indexes(key, ids, objs).wait();
+			}
 		}
 
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<std::string> &indexes) {
@@ -81,11 +98,6 @@ class storage : public elliptics::node {
 			return std::move(results);
 		}
 
-	private:
-		std::vector<int> m_groups;
-		wookie::split m_spl;
-		std::string m_namespace;
-
 		elliptics::session create_session(void) {
 			elliptics::session s(*this);
 
@@ -100,6 +112,11 @@ class storage : public elliptics::node {
 
 			return s;
 		}
+
+	private:
+		std::vector<int> m_groups;
+		wookie::split m_spl;
+		std::string m_namespace;
 };
 
 }};

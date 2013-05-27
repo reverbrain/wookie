@@ -129,7 +129,7 @@ class url_processor {
 			p.parse(reply.data);
 
 			try {
-				m_st.process(reply.url, p.text(), ts);
+				m_st.process(reply.url, p.text(), ts, m_base + ".collection");
 			} catch (const std::exception &e) {
 				std::cerr << reply.url << ": index processing exception: " << e.what() << std::endl;
 				download(reply.request.url);
@@ -214,10 +214,12 @@ class url_processor {
 
 			res.emplace_back(store_document(reply.url, reply.data, ts));
 			if (reply.url != reply.request.url)
-				res.emplace_back(store_document(reply.request.url, std::string(), ts));
+				res.emplace_back(store_document(reply.request.url, reply.url, ts));
 
 			if (text) {
 				process_text(reply, ts);
+			} else {
+				m_st.process(reply.url, std::string(), ts, m_base + ".collection");
 			}
 
 			for (auto && r : res) {

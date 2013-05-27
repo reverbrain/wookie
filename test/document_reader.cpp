@@ -7,6 +7,19 @@
 
 using namespace ioremap;
 
+static wookie::document dreader_unpack(elliptics::data_pointer &result)
+{
+	msgpack::unpacked msg;
+	msgpack::unpack(&msg, result.data<char>(), result.size());
+
+	wookie::document doc;
+	msg.get().convert(&doc);
+
+	std::cout << doc << std::endl;
+
+	return doc;
+}
+
 int main(int argc, char *argv[])
 {
 	int groups_array[] = {1, 2, 3};
@@ -19,6 +32,7 @@ int main(int argc, char *argv[])
 	std::string ns;
 	std::string doc_out;
 	std::string id;
+	bool iterate = false;
 
 	namespace po = boost::program_options;
 	po::options_description desc("Options");
@@ -28,6 +42,7 @@ int main(int argc, char *argv[])
 		("log-level", po::value<int>(&log_level)->default_value(DNET_LOG_ERROR), "Log level")
 		("groups", po::value<std::string>(&group_string), "Groups which will host indexes and data, format: 1:2:3")
 		("namespace", po::value<std::string>(&ns), "Namespace for urls and indexes")
+		("iterate", "Iterate over documents in given collection or just download")
 		("url", po::value<std::string>(&url), "Fetch object from storage by URL")
 		("id", po::value<std::string>(&id), "Fetch object from storage by ID")
 		("document-output", po::value<std::string>(&doc_out), "Put object into this file")
@@ -43,6 +58,8 @@ int main(int argc, char *argv[])
 		std::cerr << desc << std::endl;
 		return -1;
 	}
+
+	iterate = vm.count("iterate") != 0;
 
 	if (url.size() == 0 && id.size() == 0) {
 		std::cerr << "You must provide either URL or ID\n" << desc << std::endl;
@@ -84,19 +101,31 @@ int main(int argc, char *argv[])
 		k = elliptics::key(raw);
 	}
 
-	elliptics::data_pointer result = st.read_data(k).get_one().file();
+	if (!iterate) {
+		elliptics::data_pointer result = st.read_data(k).get_one().file();
+		wookie::document doc = dreader_unpack(result);
 
-	msgpack::unpacked msg;
-	msgpack::unpack(&msg, result.data<char>(), result.size());
+		if (doc_out.size() > 0) {
+			std::ofstream out(doc_out.c_str(), std::ios::trunc);
 
-	wookie::document doc;
-	msg.get().convert(&doc);
+			out.write(doc.data.c_str(), doc.data.size());
+		}
+	} else {
+		elliptics::session sess = st.create_session();
+		k.transform(sess);
 
-	std::cout << doc << std::endl;
+		std::vector<dnet_raw_id> index;
+		index.push_back(k.raw_id());
 
-	if (doc_out.size() > 0) {
-		std::ofstream out(doc_out.c_str(), std::ios::trunc);
+		std::vector<elliptics::find_indexes_result_entry> results;		
+		results = st.find(index);
 
-		out.write(doc.data.c_str(), doc.data.size());
+		for (auto r : results) {
+			for (auto idx : r.indexes) {
+				dreader_unpack(idx.second);
+			}
+		}
 	}
+
+	return 0;
 }
