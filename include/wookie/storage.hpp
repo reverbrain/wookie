@@ -60,6 +60,7 @@ class storage : public elliptics::node {
 			}
 
 			if (ids.size()) {
+				std::cout << "Updating ... " << key << std::endl;
 				create_session().update_indexes(key, ids, objs).wait();
 			}
 		}
