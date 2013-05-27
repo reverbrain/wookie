@@ -219,6 +219,7 @@ class url_processor {
 			if (text) {
 				process_text(reply, ts);
 			} else {
+				// update just a master collection
 				m_st.process(reply.url, std::string(), ts, m_base + ".collection");
 			}
 
