@@ -80,6 +80,12 @@ class dmanager {
 			ioremap::swarm::network_request request;
 			request.follow_location = true;
 			request.url = normalized_url;
+			request.headers.push_back(std::make_pair("User-Agent", "Mozilla/5.0 (Windows NT 6.1; rv:10.0.2) Gecko/20100101 Firefox/10.0.2"));
+			request.headers.push_back(std::make_pair("Referer", "http://www.kinopoisk.ru/reviews/"));
+			request.headers.push_back(std::make_pair("Host", "www.kinopoisk.ru"));
+			request.headers.push_back(std::make_pair("Cache-Control", "max-age=0"));
+			request.headers.push_back(std::make_pair("DNT", "1"));
+			request.headers.push_back(std::make_pair("Accept-Charset", "UTF-8"));
 
 			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
 		}

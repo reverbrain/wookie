@@ -124,6 +124,15 @@ class url_processor {
 			return m_st.write_document(d);
 		}
 
+		bool has_ending(const std::string &str, const std::string &end)
+		{
+			if (str.length() >= end.length()) {
+				return str.compare(str.length() - end.length(), end.length(), end) == 0;
+			} else {
+				return false;
+			}
+		}
+
 		void process_text(const ioremap::swarm::network_reply &reply, struct dnet_time &ts) {
 			wookie::parser p;
 			p.parse(reply.data);
@@ -160,6 +169,23 @@ class url_processor {
 					if ((m_recursion == url::within_domain) && (host != m_base))
 						continue;
 
+					static const char *binary_endings[] = {".png", ".jpg", ".jpeg", ".mpg", ".mp3", ".avi", ".mp4", ".ogg",
+						".cgi", ".gif", ".swf", ".flv"};
+
+					bool is_binary = false;
+					for (auto s : binary_endings) {
+						if (has_ending(request_url, s)) {
+							is_binary = true;
+							break;
+						}
+					}
+
+					if (is_binary)
+						continue;
+
+					if (request_url.find("kinopoisk.ru/film/") == std::string::npos)
+						continue;
+
 					if (!inflight_insert(request_url))
 						continue;
 
@@ -194,8 +220,6 @@ class url_processor {
 			bool has_content_type = false;
 			for (auto h : reply.headers) {
 				if (h.first == "Content-Type") {
-					std::cout << h.second << std::endl;
-
 					text = !strncmp(h.second.c_str(), "text/", 5);
 					has_content_type = true;
 					break;
@@ -215,7 +239,7 @@ class url_processor {
 			res.emplace_back(store_document(reply.url, reply.data, ts));
 			if (reply.url != reply.request.url) {
 				res.emplace_back(store_document(reply.request.url, reply.url, ts));
-				m_st.process(reply.request.url, std::string(), ts, m_base + ".collection");
+				m_st.process(reply.request.url, reply.url, ts, m_base + ".collection");
 			}
 
 			if (text) {
