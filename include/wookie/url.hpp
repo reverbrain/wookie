@@ -1,8 +1,9 @@
 #ifndef __WOOKIE_URL_HPP
 #define __WOOKIE_URL_HPP
 
-#include "wookie/dmanager.hpp"
-#include "wookie/parser.hpp"
+#include "dmanager.hpp"
+#include "parser.hpp"
+#include "storage.hpp"
 
 #include <mutex>
 
@@ -126,13 +127,13 @@ class url_processor {
 
 		void process_text(const ioremap::swarm::network_reply &reply, struct dnet_time &ts) {
 			wookie::parser p;
-			p.parse(reply.data);
+            p.parse(reply.get_data());
 
 			try {
-				m_st.process(reply.url, p.text(), ts, m_base + ".collection");
+                m_st.process(reply.get_url(), p.text(), ts, m_base + ".collection");
 			} catch (const std::exception &e) {
-				std::cerr << reply.url << ": index processing exception: " << e.what() << std::endl;
-				download(reply.request.url);
+				std::cerr << reply.get_url() << ": index processing exception: " << e.what() << std::endl;
+				download(reply.get_request().get_url());
 			}
 
 
@@ -140,8 +141,8 @@ class url_processor {
 				return;
 
 			ioremap::swarm::network_url received_url;
-			if (!received_url.set_base(reply.url))
-				ioremap::elliptics::throw_error(-EINVAL, "Could not set network-url-base for orig URL '%s'", reply.url.c_str());
+			if (!received_url.set_base(reply.get_url()))
+				ioremap::elliptics::throw_error(-EINVAL, "Could not set network-url-base for orig URL '%s'", reply.get_url().c_str());
 
 			switch (m_recursion) {
 			case url::none: /* can not be here */
@@ -154,7 +155,7 @@ class url_processor {
 					if ((request_url.compare(0, 6, "https:") != 0) && (request_url.compare(0, 5, "http:") != 0))
 						continue;
 
-					if (request_url.empty() || host.empty() || (request_url == reply.url))
+					if (request_url.empty() || host.empty() || (request_url == reply.get_url()))
 						continue;
 
 					if ((m_recursion == url::within_domain) && (host != m_base))
@@ -176,23 +177,23 @@ class url_processor {
 		}
 
 		void process_url(const ioremap::swarm::network_reply &reply) {
-			if (reply.error) {
-				std::cout << "Error ... " << reply.url << ": " << reply.error << std::endl;
+			if (reply.get_error()) {
+				std::cout << "Error ... " << reply.get_url() << ": " << reply.get_error() << std::endl;
 				return;
 			}
 
-			std::cout << "Processing  ... " << reply.request.url;
-			if (reply.url != reply.request.url)
-				std::cout << " -> " << reply.url;
+            std::cout << "Processing  ... " << reply.get_request().get_url();
+			if (reply.get_url() != reply.get_request().get_url())
+				std::cout << " -> " << reply.get_url();
 
 			std::cout << ", total-urls: " << m_total <<
-				", data-size: " << reply.data.size() <<
-				", headers: " << reply.headers.size() <<
+				", data-size: " << reply.get_data().size() <<
+				", headers: " << reply.get_headers().size() <<
 				std::endl;
 
 			bool text = false;
 			bool has_content_type = false;
-			for (auto h : reply.headers) {
+			for (auto h : reply.get_headers()) {
 				if (h.first == "Content-Type") {
 					std::cout << h.second << std::endl;
 
@@ -203,7 +204,7 @@ class url_processor {
 			}
 
 			if (!has_content_type) {
-				text = m_magic.is_text(reply.data.c_str(), reply.data.size());
+				text = m_magic.is_text(reply.get_data().c_str(), reply.get_data().size());
 			}
 
 			++m_total;
@@ -212,23 +213,23 @@ class url_processor {
 			struct dnet_time ts;
 			dnet_current_time(&ts);
 
-			res.emplace_back(store_document(reply.url, reply.data, ts));
-			if (reply.url != reply.request.url) {
-				res.emplace_back(store_document(reply.request.url, reply.url, ts));
-				m_st.process(reply.request.url, std::string(), ts, m_base + ".collection");
+			res.emplace_back(store_document(reply.get_url(), reply.get_data(), ts));
+			if (reply.get_url() != reply.get_request().get_url()) {
+				res.emplace_back(store_document(reply.get_request().get_url(), reply.get_url(), ts));
+				m_st.process(reply.get_request().get_url(), std::string(), ts, m_base + ".collection");
 			}
 
 			if (text) {
 				process_text(reply, ts);
 			} else {
 				// update just a master collection
-				m_st.process(reply.url, std::string(), ts, m_base + ".collection");
+				m_st.process(reply.get_url(), std::string(), ts, m_base + ".collection");
 			}
 
 			for (auto && r : res) {
 				r.wait();
 				if (r.error()) {
-					std::cout << "Document storage error: " << reply.request.url << " " << r.error().message() << std::endl;
+					std::cout << "Document storage error: " << reply.get_request().get_url() << " " << r.error().message() << std::endl;
 				}
 			}
 		}

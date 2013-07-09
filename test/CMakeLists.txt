@@ -3,6 +3,7 @@ target_link_libraries(wookie_stem_test wookie_stem)
 
 add_executable(wookie_rindex_test rindex.cpp)
 target_link_libraries(wookie_rindex_test
+	wookie
 	wookie_stem
 	${Boost_PROGRAM_OPTIONS_LIBRARY}
 	${Boost_LOCALE_LIBRARY}
@@ -18,6 +19,7 @@ target_link_libraries(wookie_rindex_test
 
 add_executable(wookie_document_reader document_reader.cpp)
 target_link_libraries(wookie_document_reader
+	wookie
 	${Boost_PROGRAM_OPTIONS_LIBRARY}
 	${elliptics_cpp_LIBRARY}
 	${elliptics_client_LIBRARY}

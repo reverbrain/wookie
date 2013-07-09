@@ -4,6 +4,7 @@
 #include <swarm/networkmanager.h>
 #include <swarm/url_finder.h>
 #include <swarm/network_url.h>
+#include <elliptics/session.hpp>
 
 #define EV_MULTIPLICITY		1
 #define EV_MINIMAL		0
@@ -78,8 +79,8 @@ class dmanager {
 				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
 
 			ioremap::swarm::network_request request;
-			request.follow_location = true;
-			request.url = normalized_url;
+            request.set_follow_location(true);
+			request.set_url(normalized_url);
 
 			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
 		}
@@ -96,6 +97,6 @@ class dmanager {
 
 
 
-}};
+}}
 
 #endif /* __WOOKIE_DOWNLOAD_HPP */

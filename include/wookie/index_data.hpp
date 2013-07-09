@@ -43,7 +43,7 @@ struct index_data {
 
 }}; /* namespace ioremap::wookie */
 
-std::ostream &operator <<(std::ostream &out, const ioremap::wookie::index_data &id)
+inline std::ostream &operator <<(std::ostream &out, const ioremap::wookie::index_data &id)
 {
 	out << id.ts << ", positions in document: ";
 	for (auto p : id.pos)
