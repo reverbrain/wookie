@@ -114,8 +114,6 @@ class split {
 
 };
 
-const std::string split::m_split_string(" \t.,:;=+()[]{}\\|?<>!#%^&*_~`'\"-\n\r");
-
 }}
 
 #endif /* __WOOKIE_SPLIT_HPP */

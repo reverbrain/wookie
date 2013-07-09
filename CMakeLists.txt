@@ -56,6 +56,7 @@ link_directories(
 	${LIBMAGIC_LIBRARY_DIRS}
 )
 
+add_subdirectory(lib)
 add_subdirectory(stem)
 
 # only enabled for C++

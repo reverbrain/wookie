@@ -94,9 +94,9 @@ int main(int argc, char *argv[])
 	elliptics::key k(url);
 	if (url.size() == 0) {
 		struct dnet_id raw;
+        memset(&raw, 0, sizeof(raw));
 		dnet_parse_numeric_id(const_cast<char *>(id.c_str()), raw.id);
 		raw.group_id = 0;
-		raw.type = 0;
 
 		k = elliptics::key(raw);
 	}
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 
 		for (auto r : results) {
 			for (auto idx : r.indexes) {
-				dreader_unpack(idx.second);
+				dreader_unpack(idx.data);
 			}
 		}
 	}

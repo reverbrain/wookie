@@ -2,6 +2,10 @@
 #define __WOOKIE_PARSER_HPP
 
 #include <libxml/HTMLparser.h>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <cstring>
 
 namespace ioremap { namespace wookie {
 

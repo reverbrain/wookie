@@ -1,9 +1,11 @@
 #ifndef __WOOKIE_OPERATORS_HPP
 #define __WOOKIE_OPERATORS_HPP
 
-#include "wookie/index_data.hpp"
+#include <elliptics/session.hpp>
 
-#include "elliptics/session.hpp"
+#include "index_data.hpp"
+#include "storage.hpp"
+#include "split.hpp"
 
 #include <algorithm>
 
@@ -90,10 +92,10 @@ class operators {
 				std::map<int, dnet_raw_id *> pos;
 
 				for (auto && index : entry.indexes) {
-					index_data idata(index.second);
+					index_data idata(index.data);
 
 					for (auto p : idata.pos)
-						pos.insert(std::make_pair(p, &index.first));
+						pos.insert(std::make_pair(p, &index.index));
 				}
 
 				int state = 0;
@@ -176,6 +178,6 @@ class operators {
 };
 
 
-}};
+}}
 
 #endif /* __WOOKIE_OPERATORS_HPP */
