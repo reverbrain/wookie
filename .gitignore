@@ -17,3 +17,5 @@ CMakeFiles
 CMakeCache.txt
 test/wookie_rindex_test
 test/wookie_stem_test
+httpserver/wookie_http
+test/wookie_document_reader
