@@ -24,38 +24,38 @@ struct rindex_processor
 
 	void process(const std::string &url, const std::string &content, const dnet_time &ts, const std::string &base_index)
 	{
-	    std::vector<std::string> ids;
-	    std::vector<elliptics::data_pointer> objs;
+		std::vector<std::string> ids;
+		std::vector<elliptics::data_pointer> objs;
 
-	    // each reverse index contains wookie::index_data object for every key stored
-	    if (content.size()) {
-		std::vector<std::string> tokens;
-		wookie::mpos_t pos = splitter.feed(content, tokens);
+		// each reverse index contains wookie::index_data object for every key stored
+		if (content.size()) {
+			std::vector<std::string> tokens;
+			wookie::mpos_t pos = splitter.feed(content, tokens);
 
-		for (auto && p : pos) {
-		    ids.emplace_back(std::move(p.first));
-		    objs.emplace_back(wookie::index_data(ts, p.first, p.second).convert());
+			for (auto && p : pos) {
+				ids.emplace_back(std::move(p.first));
+				objs.emplace_back(wookie::index_data(ts, p.first, p.second).convert());
+			}
 		}
-	    }
 
-	    // base index contains wookie::document object for every key stored
-	    if (base_index.size()) {
-		wookie::document doc;
-		doc.ts = ts;
-		doc.key = url;
-		doc.data = url;
+		// base index contains wookie::document object for every key stored
+		if (base_index.size()) {
+			wookie::document doc;
+			doc.ts = ts;
+			doc.key = url;
+			doc.data = url;
 
-		msgpack::sbuffer doc_buffer;
-		msgpack::pack(&doc_buffer, doc);
+			msgpack::sbuffer doc_buffer;
+			msgpack::pack(&doc_buffer, doc);
 
-		ids.push_back(base_index);
-		objs.emplace_back(elliptics::data_pointer::copy(doc_buffer.data(), doc_buffer.size()));
-	    }
+			ids.push_back(base_index);
+			objs.emplace_back(elliptics::data_pointer::copy(doc_buffer.data(), doc_buffer.size()));
+		}
 
-	    if (ids.size()) {
-		std::cout << "Updating ... " << url << std::endl;
-		engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
-	    }
+		if (ids.size()) {
+			std::cout << "Updating ... " << url << std::endl;
+			engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
+		}
 	}
 
 	void process_text(const ioremap::swarm::network_reply &reply, wookie::document_type) {
