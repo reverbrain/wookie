@@ -211,6 +211,8 @@ public:
 		dnet_current_time(&ts);
 
 		res.emplace_back(store_document(reply.get_url(), reply.get_data(), ts));
+
+		// if original URL redirected to other location, store object by original URL too
 		if (reply.get_url() != reply.get_request().get_url()) {
 			res.emplace_back(store_document(reply.get_request().get_url(), reply.get_url(), ts));
 //			storage.process(reply.get_request().get_url(), std::string(), ts, base + ".collection");
@@ -241,7 +243,7 @@ public:
 				if ((request_url.compare(0, 6, "https:") != 0) && (request_url.compare(0, 5, "http:") != 0))
 					continue;
 
-				// Skip invalid and same urls
+				// Skip invalid and the same urls
 				if (request_url.empty() || host.empty() || (request_url == reply.get_url()))
 					continue;
 

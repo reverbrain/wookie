@@ -22,14 +22,15 @@ struct rindex_processor
 	{
 	}
 
-	void process(const std::string &key, const std::string &data, const dnet_time &ts, const std::string &base_index)
+	void process(const std::string &url, const std::string &content, const dnet_time &ts, const std::string &base_index)
 	{
 	    std::vector<std::string> ids;
 	    std::vector<elliptics::data_pointer> objs;
 
-	    if (data.size()) {
+	    // each reverse index contains wookie::index_data object for every key stored
+	    if (content.size()) {
 		std::vector<std::string> tokens;
-		wookie::mpos_t pos = splitter.feed(data, tokens);
+		wookie::mpos_t pos = splitter.feed(content, tokens);
 
 		for (auto && p : pos) {
 		    ids.emplace_back(std::move(p.first));
@@ -37,11 +38,12 @@ struct rindex_processor
 		}
 	    }
 
+	    // base index contains wookie::document object for every key stored
 	    if (base_index.size()) {
 		wookie::document doc;
 		doc.ts = ts;
-		doc.key = key;
-		doc.data = key;
+		doc.key = url;
+		doc.data = url;
 
 		msgpack::sbuffer doc_buffer;
 		msgpack::pack(&doc_buffer, doc);
@@ -51,8 +53,8 @@ struct rindex_processor
 	    }
 
 	    if (ids.size()) {
-		std::cout << "Updating ... " << key << std::endl;
-		engine.get_storage()->create_session().set_indexes(key, ids, objs).wait();
+		std::cout << "Updating ... " << url << std::endl;
+		engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
 	    }
 	}
 
