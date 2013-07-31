@@ -5,6 +5,7 @@
 #include <msgpack.hpp>
 
 #include <elliptics/cppdef.h>
+#include <elliptics/debug.hpp>
 
 #ifndef __WOOKIE_DOCUMENT_HPP
 #define __WOOKIE_DOCUMENT_HPP
@@ -84,17 +85,10 @@ static inline msgpack::packer<Stream> &operator <<(msgpack::packer<Stream> &o, c
 
 } /* namespace msgpack */
 
-
 static inline std::ostream &operator <<(std::ostream &out, const ioremap::wookie::document &d)
 {
-	char tstr[64];
-	struct tm tm;
-
-	localtime_r((time_t *)&d.ts.tsec, &tm);
-	strftime(tstr, sizeof(tstr), "%F %R:%S %Z", &tm);
-
-	out.precision(6);
-	out << tstr << "." << d.ts.tnsec / 1000 << ": key: '" << d.key << "', doc-size: " << d.data.size();
+	out << d.ts;
+	out << ": key: '" << d.key << "', doc-size: " << d.data.size();
 	return out;
 }
 

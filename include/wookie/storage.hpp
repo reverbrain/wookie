@@ -22,6 +22,9 @@ class storage : public elliptics::node {
 		elliptics::async_write_result write_document(ioremap::wookie::document &d);
 		elliptics::async_read_result read_data(const elliptics::key &key);
 
+		document read_document(const elliptics::key &key);
+		static document unpack_document(const elliptics::data_pointer &result);
+
 		std::vector<dnet_raw_id> transform_tokens(const std::vector<std::string> &tokens);
 
 		elliptics::session create_session(void);

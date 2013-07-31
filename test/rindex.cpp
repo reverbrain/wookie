@@ -53,7 +53,7 @@ struct rindex_processor
 		}
 
 		if (ids.size()) {
-			std::cout << "Rindex updating ... " << url << ", indexes: " << ids.size() << ", base: " << base_index << std::endl;
+			std::cout << "Rindex update ... url: " << url << ": indexes: " << ids.size() << std::endl;
 			engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
 		}
 	}
@@ -107,7 +107,15 @@ int main(int argc, char *argv[])
 		("url", value<std::string>(&url), "Url to download")
 	;
 
-	engine.parse_command_line(argc, argv, vm);
+	try {
+		int err = engine.parse_command_line(argc, argv, vm);
+		if (err < 0)
+			return err;
+	} catch (const std::exception &e) {
+		std::cerr << "Command line parsing failed: " << e.what() << std::endl;
+		engine.show_help_message(std::cerr);
+		return -1;
+	}
 
 	if (!vm.count("find") && !vm.count("url")) {
 		std::cerr << "You must provide either URL or FIND option" << std::endl;

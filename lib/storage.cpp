@@ -26,8 +26,29 @@ elliptics::async_write_result storage::write_document(ioremap::wookie::document 
 	return create_session().write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
 }
 
+document storage::unpack_document(const elliptics::data_pointer &result) {
+	msgpack::unpacked msg;
+	msgpack::unpack(&msg, result.data<char>(), result.size());
+
+	document doc;
+	msg.get().convert(&doc);
+
+	return doc;
+}
+
 elliptics::async_read_result storage::read_data(const elliptics::key &key) {
 	return create_session().read_data(key, 0, 0);
+}
+
+document storage::read_document(const elliptics::key &key) {
+	auto ret = read_data(key);
+	ret.wait();
+
+	if (ret.error().code())
+		elliptics::throw_error(ret.error().code(), "Could not read url %s", key.to_string().c_str());
+
+	const elliptics::data_pointer &result = ret.get_one().file();
+	return unpack_document(result);
 }
 
 std::vector<dnet_raw_id> storage::transform_tokens(const std::vector<std::string> &tokens) {

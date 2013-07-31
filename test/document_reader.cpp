@@ -7,19 +7,6 @@
 
 using namespace ioremap;
 
-static wookie::document dreader_unpack(elliptics::data_pointer &result)
-{
-	msgpack::unpacked msg;
-	msgpack::unpack(&msg, result.data<char>(), result.size());
-
-	wookie::document doc;
-	msg.get().convert(&doc);
-
-	std::cout << doc << std::endl;
-
-	return doc;
-}
-
 int main(int argc, char *argv[])
 {
 	int groups_array[] = {1, 2, 3};
@@ -51,8 +38,14 @@ int main(int argc, char *argv[])
 	;
 
 	po::variables_map vm;
-	po::store(po::parse_command_line(argc, argv, desc), vm);
-	po::notify(vm);
+	try {
+		po::store(po::parse_command_line(argc, argv, desc), vm);
+		po::notify(vm);
+	} catch (const std::exception &e) {
+		std::cerr << "Command line parsing failed: " << e.what() << std::endl;
+		std::cerr << desc << std::endl;
+		return -1;
+	}
 
 	if (vm.count("help") || !vm.count("remote")) {
 		std::cerr << desc << std::endl;
@@ -103,8 +96,8 @@ int main(int argc, char *argv[])
 
 	try {
 		if (!iterate) {
-			elliptics::data_pointer result = st.read_data(k).get_one().file();
-			wookie::document doc = dreader_unpack(result);
+			wookie::document doc = st.read_document(k);
+			std::cout << doc << std::endl;
 
 			if (doc_out.size() > 0) {
 				std::ofstream out(doc_out.c_str(), std::ios::trunc);
@@ -123,7 +116,8 @@ int main(int argc, char *argv[])
 
 			for (auto r : results) {
 				for (auto idx : r.indexes) {
-					dreader_unpack(idx.data);
+					wookie::document doc = wookie::storage::unpack_document(idx.data);
+					std::cout << doc << std::endl;
 				}
 			}
 		}

@@ -4,6 +4,8 @@
 #include <swarm/networkrequest.h>
 #include <boost/program_options.hpp>
 
+#include <wookie/document.hpp>
+
 namespace ioremap { namespace wookie {
 
 class engine_data;
@@ -50,6 +52,7 @@ public:
 	int parse_command_line(int argc, char **argv, boost::program_options::variables_map &vm);
 
 	void download(const std::string &url);
+	void found_in_page_cache(const std::string &url, const document &doc);
 
 	int run();
 

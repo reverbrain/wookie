@@ -17,6 +17,8 @@
 #include <atomic>
 #include <thread>
 
+#include <wookie/document.hpp>
+
 namespace ioremap { namespace wookie {
 
 class downloader {
@@ -72,15 +74,15 @@ class dmanager {
 		}
 
 		void feed(const std::string &url, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
-			ioremap::swarm::network_url url_parser;
-			url_parser.set_base(url);
-			std::string normalized_url = url_parser.normalized();
-			if (normalized_url.empty())
-				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
-
 			ioremap::swarm::network_request request;
-			request.set_follow_location(true);
-			request.set_url(normalized_url);
+			prepare_request(url, request);
+			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
+		}
+
+		void feed(const std::string &url, const document &doc, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
+			ioremap::swarm::network_request request;
+			prepare_request(url, request);
+			request.set_if_modified_since(doc.ts.tsec);
 
 			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
 		}
@@ -92,6 +94,17 @@ class dmanager {
 
 		void signal_received(ev::sig &sig, int ) {
 			sig.loop.break_loop();
+		}
+
+		void prepare_request(const std::string &url, ioremap::swarm::network_request &request) {
+			ioremap::swarm::network_url url_parser;
+			url_parser.set_base(url);
+			std::string normalized_url = url_parser.normalized();
+			if (normalized_url.empty())
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
+
+			request.set_follow_location(true);
+			request.set_url(normalized_url);
 		}
 };
 

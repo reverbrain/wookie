@@ -134,47 +134,60 @@ public:
 	boost::program_options::options_description command_line_options;
 
 	std::mutex inflight_lock;
-	std::set<std::string> inflight;
+	std::map<std::string, document> inflight;
 
 	std::atomic_long total;
 	magic_data magic;
 
-	engine_data() : total(0)
-	{
+	struct dnet_time generation_time;
+
+	engine_data() : total(0) {
+		dnet_current_time(&generation_time);
 	}
 
-	void download(const std::string &url)
-	{
+	void download(const std::string &url) {
 		std::cout << "Downloading ... " << url << std::endl;
 		downloader->feed(url, std::bind(&engine_data::process_url, this, std::placeholders::_1));
 	}
 
-	bool inflight_insert(const std::string &url)
-	{
+	void found_in_page_cache(const std::string &url, const document &doc) {
+		std::cout << "Downloading (if-modified-since " << doc.ts << ") ... " << url << std::endl;
+		inflight_insert(url, doc);
+		downloader->feed(url, doc, std::bind(&engine_data::process_url, this, std::placeholders::_1));
+	}
+
+	bool inflight_insert(const std::string &url, const document &doc) {
 		std::unique_lock<std::mutex> guard(inflight_lock);
 
 		auto check = inflight.find(url);
 		if (check == inflight.end()) {
-			inflight.insert(url);
+			inflight.insert(std::make_pair(url, doc));
 			return true;
+		} else {
+			check->second = doc;
 		}
 
 		return false;
 	}
 
-	void infligt_erase(const std::string &url)
-	{
+	bool inflight_insert(const std::string &url) {
+		return inflight_insert(url, document());
+	}
+
+	document inflight_erase(const std::string &url) {
+		document d;
+
 		std::unique_lock<std::mutex> guard(inflight_lock);
 		auto check = inflight.find(url);
 		if (check != inflight.end()) {
+			d = check->second;
 			inflight.erase(check);
 		}
+
+		return d;
 	}
 
-	ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content, const dnet_time &ts)
-	{
-		infligt_erase(url);
-
+	ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content, const dnet_time &ts) {
 		wookie::document d;
 		d.ts = ts;
 		d.key = url;
@@ -183,18 +196,13 @@ public:
 		return storage->write_document(d);
 	}
 
-	void process_url(const swarm::network_reply &reply)
-	{
-		if (reply.get_error()) {
-			std::cout << "Error ... " << reply.get_url() << ": " << reply.get_error() << std::endl;
-			return;
-		}
-
+	void process_reply(const swarm::network_reply &reply) {
 		std::cout << "Processing  ... " << reply.get_request().get_url();
 		if (reply.get_url() != reply.get_request().get_url())
 			std::cout << " -> " << reply.get_url();
 
-		std::cout << ", total-urls: " << total <<
+		std::cout << ", code: " << reply.get_code() <<
+			     ", total-urls: " << total <<
 			     ", data-size: " << reply.get_data().size() <<
 			     ", headers: " << reply.get_headers().size() <<
 			     std::endl;
@@ -213,14 +221,14 @@ public:
 		res.emplace_back(store_document(reply.get_url(), reply.get_data(), ts));
 
 		// if original URL redirected to other location, store object by original URL too
-		if (reply.get_url() != reply.get_request().get_url()) {
+		if (reply.get_url() != reply.get_request().get_url())
 			res.emplace_back(store_document(reply.get_request().get_url(), reply.get_url(), ts));
-//			storage.process(reply.get_request().get_url(), std::string(), ts, base + ".collection");
-		}
 
 		if (accepted_by_filters) {
-			for (auto it = processors.begin(); it != processors.end(); ++it)
-				(*it)(reply, document_new);
+			if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
+				for (auto it = processors.begin(); it != processors.end(); ++it)
+					(*it)(reply, document_new);
+			}
 
 			std::vector<std::string> urls;
 
@@ -259,13 +267,26 @@ public:
 
 					auto rres = storage->read_data(request_url);
 					rres.wait();
-					if (rres.error()) {
-						std::cout << "Page cache: " << request_url << " " << rres.error().message() << std::endl;
+					if (rres.error().code()) {
+						std::cout << "Page cache error (download from internet): url: " << request_url <<
+							", error: " << rres.error().message() << std::endl;
 						download(request_url);
 					} else {
-						for (auto it = processors.begin(); it != processors.end(); ++it)
-							(*it)(reply, document_cache);
-						infligt_erase(request_url);
+						document doc = storage::unpack_document(rres.get_one().file());
+						// document was stored before we started this update generation, process it again
+						int will_process = dnet_time_before(&doc.ts, &generation_time);
+						std::cout << "Url has been found in page cache: url: " << request_url <<
+							", will process (document was saved before current engine started): " << will_process <<
+							std::endl;
+
+						if (will_process) {
+							found_in_page_cache(request_url, doc);
+
+							if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
+								for (auto it = processors.begin(); it != processors.end(); ++it)
+									(*it)(reply, document_cache);
+							}
+						}
 					}
 				}
 			}
@@ -279,6 +300,24 @@ public:
 			if (r.error()) {
 				std::cout << "Document storage error: " << reply.get_request().get_url() << " " << r.error().message() << std::endl;
 			}
+		}
+	}
+
+	void process_url(const swarm::network_reply &reply) {
+		document old_doc = inflight_erase(reply.get_request().get_url());
+
+		if (reply.get_error()) {
+			std::cout << "Error ... " << reply.get_url() << ": " << reply.get_error() << std::endl;
+			return;
+		}
+
+		if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
+			process_reply(reply);
+		} else {
+			swarm::network_reply r(reply);
+
+			r.set_data(old_doc.data);
+			process_reply(r);
 		}
 	}
 };
@@ -371,7 +410,10 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 	notify(vm);
 
 	if (vm.count("help") || !vm.count("remote")) {
-		std::cerr << m_data->options << std::endl;
+		std::cerr << general_options << std::endl;
+		for (auto it = m_data->options.begin(); it != m_data->options.end(); ++it)
+			std::cerr << *it << std::endl;
+
 		return -1;
 	}
 
@@ -420,6 +462,11 @@ int engine::run()
 {
 	m_data->downloader->start();
 	return 0;
+}
+
+void engine::found_in_page_cache(const std::string &url, const document &doc)
+{
+	m_data->found_in_page_cache(url, doc);
 }
 
 }}
