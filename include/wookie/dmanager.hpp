@@ -79,7 +79,7 @@ class dmanager {
 				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
 
 			ioremap::swarm::network_request request;
-            request.set_follow_location(true);
+			request.set_follow_location(true);
 			request.set_url(normalized_url);
 
 			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);

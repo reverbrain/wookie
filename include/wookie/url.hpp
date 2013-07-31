@@ -127,10 +127,10 @@ class url_processor {
 
 		void process_text(const ioremap::swarm::network_reply &reply, struct dnet_time &ts) {
 			wookie::parser p;
-            p.parse(reply.get_data());
+			p.parse(reply.get_data());
 
 			try {
-                m_st.process(reply.get_url(), p.text(), ts, m_base + ".collection");
+				m_st.process(reply.get_url(), p.text(), ts, m_base + ".collection");
 			} catch (const std::exception &e) {
 				std::cerr << reply.get_url() << ": index processing exception: " << e.what() << std::endl;
 				download(reply.get_request().get_url());
@@ -182,7 +182,7 @@ class url_processor {
 				return;
 			}
 
-            std::cout << "Processing  ... " << reply.get_request().get_url();
+			std::cout << "Processing  ... " << reply.get_request().get_url();
 			if (reply.get_url() != reply.get_request().get_url())
 				std::cout << " -> " << reply.get_url();
 
