@@ -11,9 +11,9 @@ class storage;
 
 enum document_type
 {
-    document_cache,
-    document_new,
-    document_update
+	document_cache,
+	document_new,
+	document_update
 };
 
 typedef std::function<std::vector<std::string> (const swarm::network_reply &reply)> parser_functor;
@@ -28,33 +28,33 @@ parser_functor create_href_parser();
 class engine
 {
 public:
-    engine();
-    engine(const engine &other) = delete;
-    ~engine();
+	engine();
+	engine(const engine &other) = delete;
+	~engine();
 
-    engine &operator =(const engine &other) = delete;
+	engine &operator =(const engine &other) = delete;
 
-    storage *get_storage();
+	storage *get_storage();
 
-    void add_options(const boost::program_options::options_description &description);
-    boost::program_options::options_description_easy_init add_options(const std::string &name);
+	void add_options(const boost::program_options::options_description &description);
+	boost::program_options::options_description_easy_init add_options(const std::string &name);
 
-    void add_parser(const parser_functor &parser);
-    void add_filter(const filter_functor &filter);
-    void add_url_filter(const url_filter_functor &filter);
-    void add_processor(const process_functor &process);
-    void add_fallback_processor(const process_functor &process);
+	void add_parser(const parser_functor &parser);
+	void add_filter(const filter_functor &filter);
+	void add_url_filter(const url_filter_functor &filter);
+	void add_processor(const process_functor &process);
+	void add_fallback_processor(const process_functor &process);
 
-    void show_help_message(std::ostream &out);
+	void show_help_message(std::ostream &out);
 
-    int parse_command_line(int argc, char **argv, boost::program_options::variables_map &vm);
+	int parse_command_line(int argc, char **argv, boost::program_options::variables_map &vm);
 
-    void download(const std::string &url);
+	void download(const std::string &url);
 
-    int run();
+	int run();
 
 private:
-    std::unique_ptr<engine_data> m_data;
+	std::unique_ptr<engine_data> m_data;
 };
 
 }}
