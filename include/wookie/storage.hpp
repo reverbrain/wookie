@@ -16,16 +16,10 @@ class storage : public elliptics::node {
 
 		void set_groups(const std::vector<int> groups);
 
-		void process_file(const std::string &key, const std::string &file);
-
-		void process(const std::string &key, const std::string &data, const dnet_time &ts, const std::string &base_index);
-
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<std::string> &indexes);
-
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<dnet_raw_id> &indexes);
 
 		elliptics::async_write_result write_document(ioremap::wookie::document &d);
-
 		elliptics::async_read_result read_data(const elliptics::key &key);
 
 		std::vector<dnet_raw_id> transform_tokens(const std::vector<std::string> &tokens);

@@ -11,50 +11,6 @@ void storage::set_groups(const std::vector<int> groups) {
 	m_groups = groups;
 }
 
-void storage::process_file(const std::string &key, const std::string &file) {
-	std::ifstream in(file.c_str());
-	std::ostringstream ss;
-	ss << in.rdbuf();
-
-	dnet_time ts;
-	dnet_current_time(&ts);
-
-	process(key, ss.str(), ts, std::string());
-}
-
-void storage::process(const std::string &key, const std::string &data, const dnet_time &ts, const std::string &base_index) {
-	std::vector<std::string> ids;
-	std::vector<elliptics::data_pointer> objs;
-
-	if (data.size()) {
-		std::vector<std::string> tokens;
-		wookie::mpos_t pos = m_spl.feed(data, tokens);
-
-		for (auto && p : pos) {
-			ids.emplace_back(std::move(p.first));
-			objs.emplace_back(index_data(ts, p.first, p.second).convert());
-		}
-	}
-
-	if (base_index.size()) {
-		document doc;
-		doc.ts = ts;
-		doc.key = key;
-		doc.data = key;
-
-		msgpack::sbuffer doc_buffer;
-		msgpack::pack(&doc_buffer, doc);
-
-		ids.push_back(base_index);
-		objs.emplace_back(elliptics::data_pointer::copy(doc_buffer.data(), doc_buffer.size()));
-	}
-
-	if (ids.size()) {
-		std::cout << "Updating ... " << key << std::endl;
-		create_session().set_indexes(key, ids, objs).wait();
-	}
-}
-
 std::vector<elliptics::find_indexes_result_entry> storage::find(const std::vector<std::string> &indexes) {
 	return std::move(create_session().find_all_indexes(indexes));
 }

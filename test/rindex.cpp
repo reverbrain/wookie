@@ -53,7 +53,7 @@ struct rindex_processor
 		}
 
 		if (ids.size()) {
-			std::cout << "Updating ... " << url << std::endl;
+			std::cout << "Rindex updating ... " << url << ", indexes: " << ids.size() << ", base: " << base_index << std::endl;
 			engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
 		}
 	}
