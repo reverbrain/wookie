@@ -94,37 +94,41 @@ int main(int argc, char *argv[])
 	elliptics::key k(url);
 	if (url.size() == 0) {
 		struct dnet_id raw;
-        memset(&raw, 0, sizeof(raw));
+		memset(&raw, 0, sizeof(raw));
 		dnet_parse_numeric_id(const_cast<char *>(id.c_str()), raw.id);
 		raw.group_id = 0;
 
 		k = elliptics::key(raw);
 	}
 
-	if (!iterate) {
-		elliptics::data_pointer result = st.read_data(k).get_one().file();
-		wookie::document doc = dreader_unpack(result);
+	try {
+		if (!iterate) {
+			elliptics::data_pointer result = st.read_data(k).get_one().file();
+			wookie::document doc = dreader_unpack(result);
 
-		if (doc_out.size() > 0) {
-			std::ofstream out(doc_out.c_str(), std::ios::trunc);
+			if (doc_out.size() > 0) {
+				std::ofstream out(doc_out.c_str(), std::ios::trunc);
 
-			out.write(doc.data.c_str(), doc.data.size());
-		}
-	} else {
-		elliptics::session sess = st.create_session();
-		k.transform(sess);
+				out.write(doc.data.c_str(), doc.data.size());
+			}
+		} else {
+			elliptics::session sess = st.create_session();
+			k.transform(sess);
 
-		std::vector<dnet_raw_id> index;
-		index.push_back(k.raw_id());
+			std::vector<dnet_raw_id> index;
+			index.push_back(k.raw_id());
 
-		std::vector<elliptics::find_indexes_result_entry> results;		
-		results = st.find(index);
+			std::vector<elliptics::find_indexes_result_entry> results;		
+			results = st.find(index);
 
-		for (auto r : results) {
-			for (auto idx : r.indexes) {
-				dreader_unpack(idx.data);
+			for (auto r : results) {
+				for (auto idx : r.indexes) {
+					dreader_unpack(idx.data);
+				}
 			}
 		}
+	} catch (const std::exception &e) {
+		std::cerr << "Caught exception: " << e.what() << std::endl;
 	}
 
 	return 0;
