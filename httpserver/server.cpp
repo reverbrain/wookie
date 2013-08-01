@@ -15,10 +15,143 @@
 
 #include <thevoid/elliptics/server.hpp>
 
+#include "wookie/storage.hpp"
 #include "wookie/split.hpp"
 
 using namespace ioremap;
 using namespace ioremap::wookie;
+
+template <typename T>
+struct on_upload : public thevoid::elliptics::io::on_upload<T>
+{
+	struct write_context {
+		std::string base_index;
+		document doc;
+		thevoid::elliptics::JsonValue result_object;
+	};
+
+	/*
+	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class without this ugly hack,
+	 * thevoid::elliptics::io::on_upload<T> in this case, which in turn doesn't have needed members and declarations
+	 *
+	 * This hack casts shared pointer to the base class to shared pointer to child class. 
+	 */
+	std::shared_ptr<on_upload> shared_from_this()
+	{
+		return std::static_pointer_cast<on_upload>(thevoid::elliptics::io::on_upload<T>::shared_from_this());
+	}
+
+	virtual void on_request(const swarm::network_request &req, const boost::asio::const_buffer &buffer) {
+		swarm::network_url url(req.get_url());
+		swarm::network_query_list query_list(url.query());
+
+		ioremap::elliptics::session sess = this->get_server()->create_session();
+
+		std::shared_ptr<write_context> ctx = std::make_shared<write_context>();
+		ctx->base_index = query_list.item_value("base_index");
+		ctx->doc.data.assign(boost::asio::buffer_cast<const char*>(buffer), boost::asio::buffer_size(buffer));
+		ctx->doc.key = query_list.item_value("name");
+
+		sess.write_data(ctx->doc.key, std::move(storage::pack_document(ctx->doc)), 0)
+				.connect(std::bind(&on_upload<T>::on_write_finished_update_index, this->shared_from_this(),
+							ctx, std::placeholders::_1, std::placeholders::_2));
+	}
+
+	virtual void on_write_finished_update_index(std::shared_ptr<write_context> ctx, const ioremap::elliptics::sync_write_result &result,
+			const ioremap::elliptics::error_info &error) {
+		if (error) {
+			this->send_reply(swarm::network_reply::service_unavailable);
+			return;
+		}
+
+		std::vector<std::string> ids;
+		std::vector<elliptics::data_pointer> objs;
+
+		// each reverse index contains wookie::index_data object for every key stored
+		if (ctx->doc.data.size()) {
+			std::vector<std::string> tokens;
+			wookie::mpos_t pos = this->get_server()->get_splitter().feed(ctx->doc.data, tokens);
+
+			for (auto && p : pos) {
+				ids.emplace_back(std::move(p.first));
+				objs.emplace_back(wookie::index_data(ctx->doc.ts, p.first, p.second).convert());
+			}
+		}
+
+		// base index contains wookie::document object for every key stored
+		if (ctx->base_index.size()) {
+			ids.push_back(ctx->base_index);
+			objs.emplace_back(std::move(storage::pack_document(ctx->doc.key, ctx->doc.key)));
+		}
+
+		if (ids.size()) {
+			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, ctx->result_object);
+
+			std::cout << "Rindex update ... url: " << ctx->doc.key << ": indexes: " << ids.size() << std::endl;
+			ioremap::elliptics::session sess = this->get_server()->create_session();
+			sess.set_indexes(ctx->doc.key, ids, objs)
+				.connect(std::bind(&on_upload<T>::on_index_update_finished, this->shared_from_this(),
+							ctx, std::placeholders::_1, std::placeholders::_2));
+		} else {
+			this->on_write_finished(result, error);
+		}
+	}
+
+	virtual void on_index_update_finished(std::shared_ptr<write_context> ctx, const ioremap::elliptics::sync_set_indexes_result &result,
+			const ioremap::elliptics::error_info &error) {
+		if (error) {
+			this->send_reply(swarm::network_reply::service_unavailable);
+			return;
+		}
+
+		(void) result;
+
+		swarm::network_reply reply;
+		reply.set_code(swarm::network_reply::ok);
+		reply.set_content_type("text/json");
+		reply.set_data(ctx->result_object.ToString());
+		reply.set_content_length(reply.get_data().size());
+
+		this->send_reply(reply);
+	}
+};
+
+template <typename T>
+struct on_get : public thevoid::elliptics::io::on_get<T>
+{
+	virtual void on_read_finished(const ioremap::elliptics::sync_read_result &result,
+			const ioremap::elliptics::error_info &error) {
+		if (error.code() == -ENOENT) {
+			this->send_reply(swarm::network_reply::not_found);
+			return;
+		} else if (error) {
+			this->send_reply(swarm::network_reply::service_unavailable);
+			return;
+		}
+
+		const ioremap::elliptics::read_result_entry &entry = result[0];
+
+		document doc = storage::unpack_document(entry.file());
+
+		const swarm::network_request &request = this->get_request();
+
+		if (request.has_if_modified_since()) {
+			if ((time_t)doc.ts.tsec <= request.get_if_modified_since()) {
+				this->send_reply(swarm::network_reply::not_modified);
+				return;
+			}
+		}
+
+		swarm::network_reply reply;
+		reply.set_code(swarm::network_reply::ok);
+		reply.set_content_length(doc.data.size());
+		reply.set_content_type("text/plain");
+		reply.set_last_modified(doc.ts.tsec);
+
+		this->send_reply(reply, std::move(doc.data));
+	}
+};
+
 
 template <typename T>
 struct on_find : public thevoid::elliptics::index::on_find<T>
@@ -93,13 +226,21 @@ public:
 		ioremap::thevoid::elliptics_server::initialize(config);
 
 		on<on_find<http_server>>("/find");
-		on<ioremap::thevoid::elliptics::io::on_get<http_server>>("/get");
-		on<ioremap::thevoid::elliptics::io::on_upload<http_server>>("/upload");
+		on<on_get<http_server>>("/get");
+		on<on_upload<http_server>>("/upload");
 		on<ioremap::thevoid::elliptics::common::on_ping<http_server>>("/ping");
 		on<ioremap::thevoid::elliptics::common::on_echo<http_server>>("/echo");
 	
 		return true;
 	}
+
+
+	wookie::split &get_splitter() {
+		return m_splitter;
+	}
+
+private:
+	wookie::split m_splitter;
 };
 
 int main(int argc, char **argv)
