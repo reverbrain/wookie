@@ -26,16 +26,20 @@ elliptics::async_write_result storage::write_document(ioremap::wookie::document 
 	return create_session().write_data(d.key, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0);
 }
 
+elliptics::data_pointer storage::pack_document(ioremap::wookie::document &doc) {
+	msgpack::sbuffer buffer;
+	msgpack::pack(&buffer, doc);
+
+	return elliptics::data_pointer::copy(buffer.data(), buffer.size());
+}
+
 elliptics::data_pointer storage::pack_document(const std::string &url, const std::string &data) {
 	ioremap::wookie::document doc;
 	doc.key = url;
 	doc.data = data;
 	dnet_current_time(&doc.ts);
 
-	msgpack::sbuffer buffer;
-	msgpack::pack(&buffer, doc);
-
-	return elliptics::data_pointer::copy(buffer.data(), buffer.size());
+	return pack_document(doc);
 }
 
 document storage::unpack_document(const elliptics::data_pointer &result) {
