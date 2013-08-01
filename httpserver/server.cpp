@@ -24,11 +24,9 @@ using namespace ioremap::wookie;
 template <typename T>
 struct on_upload : public thevoid::elliptics::io::on_upload<T>
 {
-	struct write_context {
-		std::string base_index;
-		document doc;
-		thevoid::elliptics::JsonValue result_object;
-	};
+	std::string m_base_index;
+	document m_doc;
+	thevoid::elliptics::JsonValue m_result_object;
 
 	/*
 	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class without this ugly hack,
@@ -47,17 +45,16 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 
 		ioremap::elliptics::session sess = this->get_server()->create_session();
 
-		std::shared_ptr<write_context> ctx = std::make_shared<write_context>();
-		ctx->base_index = query_list.item_value("base_index");
-		ctx->doc.data.assign(boost::asio::buffer_cast<const char*>(buffer), boost::asio::buffer_size(buffer));
-		ctx->doc.key = query_list.item_value("name");
+		m_base_index = query_list.item_value("base_index");
+		m_doc.data.assign(boost::asio::buffer_cast<const char*>(buffer), boost::asio::buffer_size(buffer));
+		m_doc.key = query_list.item_value("name");
 
-		sess.write_data(ctx->doc.key, std::move(storage::pack_document(ctx->doc)), 0)
+		sess.write_data(m_doc.key, std::move(storage::pack_document(m_doc)), 0)
 				.connect(std::bind(&on_upload<T>::on_write_finished_update_index, this->shared_from_this(),
-							ctx, std::placeholders::_1, std::placeholders::_2));
+							std::placeholders::_1, std::placeholders::_2));
 	}
 
-	virtual void on_write_finished_update_index(std::shared_ptr<write_context> ctx, const ioremap::elliptics::sync_write_result &result,
+	virtual void on_write_finished_update_index(const ioremap::elliptics::sync_write_result &result,
 			const ioremap::elliptics::error_info &error) {
 		if (error) {
 			this->send_reply(swarm::network_reply::service_unavailable);
@@ -68,36 +65,36 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		std::vector<elliptics::data_pointer> objs;
 
 		// each reverse index contains wookie::index_data object for every key stored
-		if (ctx->doc.data.size()) {
+		if (m_doc.data.size()) {
 			std::vector<std::string> tokens;
-			wookie::mpos_t pos = this->get_server()->get_splitter().feed(ctx->doc.data, tokens);
+			wookie::mpos_t pos = this->get_server()->get_splitter().feed(m_doc.data, tokens);
 
 			for (auto && p : pos) {
 				ids.emplace_back(std::move(p.first));
-				objs.emplace_back(wookie::index_data(ctx->doc.ts, p.first, p.second).convert());
+				objs.emplace_back(wookie::index_data(m_doc.ts, p.first, p.second).convert());
 			}
 		}
 
 		// base index contains wookie::document object for every key stored
-		if (ctx->base_index.size()) {
-			ids.push_back(ctx->base_index);
-			objs.emplace_back(std::move(storage::pack_document(ctx->doc.key, ctx->doc.key)));
+		if (m_base_index.size()) {
+			ids.push_back(m_base_index);
+			objs.emplace_back(std::move(storage::pack_document(m_doc.key, m_doc.key)));
 		}
 
 		if (ids.size()) {
-			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, ctx->result_object);
+			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, m_result_object);
 
-			std::cout << "Rindex update ... url: " << ctx->doc.key << ": indexes: " << ids.size() << std::endl;
+			std::cout << "Rindex update ... url: " << m_doc.key << ": indexes: " << ids.size() << std::endl;
 			ioremap::elliptics::session sess = this->get_server()->create_session();
-			sess.set_indexes(ctx->doc.key, ids, objs)
+			sess.set_indexes(m_doc.key, ids, objs)
 				.connect(std::bind(&on_upload<T>::on_index_update_finished, this->shared_from_this(),
-							ctx, std::placeholders::_1, std::placeholders::_2));
+							std::placeholders::_1, std::placeholders::_2));
 		} else {
 			this->on_write_finished(result, error);
 		}
 	}
 
-	virtual void on_index_update_finished(std::shared_ptr<write_context> ctx, const ioremap::elliptics::sync_set_indexes_result &result,
+	virtual void on_index_update_finished(const ioremap::elliptics::sync_set_indexes_result &result,
 			const ioremap::elliptics::error_info &error) {
 		if (error) {
 			this->send_reply(swarm::network_reply::service_unavailable);
@@ -109,7 +106,7 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		swarm::network_reply reply;
 		reply.set_code(swarm::network_reply::ok);
 		reply.set_content_type("text/json");
-		reply.set_data(ctx->result_object.ToString());
+		reply.set_data(m_result_object.ToString());
 		reply.set_content_length(reply.get_data().size());
 
 		this->send_reply(reply);
