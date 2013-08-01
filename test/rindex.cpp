@@ -3,8 +3,8 @@
 #include "wookie/url.hpp"
 
 #include "wookie/engine.hpp"
-#include "wookie/split.hpp"
 #include "wookie/index_data.hpp"
+#include "wookie/basic_elliptics_splitter.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -15,7 +15,8 @@ struct rindex_processor
 	wookie::engine &engine;
 	std::string base;
 	bool fallback;
-	wookie::split splitter;
+
+	wookie::basic_elliptics_splitter m_splitter;
 
 	rindex_processor(wookie::engine &engine, const std::string &base, bool fallback)
 		: engine(engine), base(base), fallback(fallback)
@@ -27,30 +28,7 @@ struct rindex_processor
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
-		// each reverse index contains wookie::index_data object for every key stored
-		if (content.size()) {
-			std::vector<std::string> tokens;
-			wookie::mpos_t pos = splitter.feed(content, tokens);
-
-			for (auto && p : pos) {
-				ids.emplace_back(std::move(p.first));
-				objs.emplace_back(wookie::index_data(ts, p.first, p.second).convert());
-			}
-		}
-
-		// base index contains wookie::document object for every key stored
-		if (base_index.size()) {
-			wookie::document doc;
-			doc.ts = ts;
-			doc.key = url;
-			doc.data = url;
-
-			msgpack::sbuffer doc_buffer;
-			msgpack::pack(&doc_buffer, doc);
-
-			ids.push_back(base_index);
-			objs.emplace_back(elliptics::data_pointer::copy(doc_buffer.data(), doc_buffer.size()));
-		}
+		m_splitter.process(url, content, ts, base_index, ids, objs);
 
 		if (ids.size()) {
 			std::cout << "Rindex update ... url: " << url << ": indexes: " << ids.size() << std::endl;

@@ -16,7 +16,7 @@
 #include <thevoid/elliptics/server.hpp>
 
 #include "wookie/storage.hpp"
-#include "wookie/split.hpp"
+#include "wookie/basic_elliptics_splitter.hpp"
 
 using namespace ioremap;
 using namespace ioremap::wookie;
@@ -64,27 +64,12 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
-		// each reverse index contains wookie::index_data object for every key stored
-		if (m_doc.data.size()) {
-			std::vector<std::string> tokens;
-			wookie::mpos_t pos = this->get_server()->get_splitter().feed(m_doc.data, tokens);
-
-			for (auto && p : pos) {
-				ids.emplace_back(std::move(p.first));
-				objs.emplace_back(wookie::index_data(m_doc.ts, p.first, p.second).convert());
-			}
-		}
-
-		// base index contains wookie::document object for every key stored
-		if (m_base_index.size()) {
-			ids.push_back(m_base_index);
-			objs.emplace_back(std::move(storage::pack_document(m_doc.key, m_doc.key)));
-		}
+		this->get_server()->get_splitter().process(m_doc, m_base_index, ids, objs);
 
 		if (ids.size()) {
 			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, m_result_object);
 
-			std::cout << "Rindex update ... url: " << m_doc.key << ": indexes: " << ids.size() << std::endl;
+			std::cout << m_doc.ts << ": rindex update ... url: " << m_doc.key << ": indexes: " << ids.size() << std::endl;
 			ioremap::elliptics::session sess = this->get_server()->create_session();
 			sess.set_indexes(m_doc.key, ids, objs)
 				.connect(std::bind(&on_upload<T>::on_index_update_finished, this->shared_from_this(),
@@ -231,13 +216,12 @@ public:
 		return true;
 	}
 
-
-	wookie::split &get_splitter() {
+	wookie::basic_elliptics_splitter &get_splitter() {
 		return m_splitter;
 	}
 
 private:
-	wookie::split m_splitter;
+	wookie::basic_elliptics_splitter m_splitter;
 };
 
 int main(int argc, char **argv)
