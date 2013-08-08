@@ -14,8 +14,10 @@
  */
 
 #include <thevoid/elliptics/server.hpp>
+#include <thevoid/elliptics/jsonvalue.hpp>
 
 #include "wookie/split.hpp"
+#include "wookie/operators.hpp"
 
 using namespace ioremap;
 using namespace ioremap::wookie;
@@ -91,8 +93,11 @@ class http_server :
 public:
 	virtual bool initialize(const rapidjson::Value &config) {
 		ioremap::thevoid::elliptics_server::initialize(config);
+		set_logger(get_logger_impl());
+		m_storage.reset(new storage(get_node().get_log(), ""));
 
 		on<on_find<http_server>>("/find");
+		on<on_search>("/search");
 		on<ioremap::thevoid::elliptics::io::on_get<http_server>>("/get");
 		on<ioremap::thevoid::elliptics::io::on_upload<http_server>>("/upload");
 		on<ioremap::thevoid::elliptics::common::on_ping<http_server>>("/ping");
@@ -100,6 +105,60 @@ public:
 	
 		return true;
 	}
+
+	ioremap::wookie::storage &get_storage() {
+		return *m_storage;
+	}
+
+	struct on_search  : public ioremap::thevoid::simple_request_stream<http_server>, public std::enable_shared_from_this<on_search> {
+		virtual void on_request(const swarm::network_request &req, const boost::asio::const_buffer &buffer) {
+			using namespace std::placeholders;
+
+			(void) buffer;
+
+			ioremap::swarm::network_url url(req.get_url());
+			ioremap::swarm::network_query_list query(url.query());
+
+			if (auto text = query.try_item("text")) {
+				ioremap::wookie::operators op(get_server()->get_storage());
+				op.find(std::bind(&on_search::on_search_finished, shared_from_this(), _1, _2), *text);
+			} else {
+				send_reply(ioremap::swarm::network_reply::bad_request);
+			}
+		}
+
+		void on_search_finished(const std::vector<dnet_raw_id> &result, const ioremap::elliptics::error_info &err) {
+			if (err) {
+				log(ioremap::swarm::LOG_ERROR, "Failed to search: %s", err.message().c_str());
+				send_reply(ioremap::swarm::network_reply::service_unavailable);
+				return;
+			}
+
+			ioremap::thevoid::elliptics::JsonValue result_object;
+
+			rapidjson::Value indexes;
+			indexes.SetArray();
+
+			for (size_t i = 0; i < result.size(); ++i) {
+				char id_str[2 * DNET_ID_SIZE + 1];
+				dnet_dump_id_len_raw(result[i].id, DNET_ID_SIZE, id_str);
+				rapidjson::Value index(id_str, result_object.GetAllocator());
+				indexes.PushBack(index, result_object.GetAllocator());
+			}
+
+			result_object.AddMember("result", indexes, result_object.GetAllocator());
+
+			swarm::network_reply reply;
+			reply.set_code(ioremap::swarm::network_reply::ok);
+			reply.set_data(result_object.ToString());
+			reply.set_content_length(reply.get_data().size());
+
+			send_reply(reply);
+		}
+	};
+
+private:
+	std::unique_ptr<ioremap::wookie::storage> m_storage;
 };
 
 int main(int argc, char **argv)

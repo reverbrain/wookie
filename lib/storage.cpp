@@ -2,7 +2,7 @@
 
 namespace ioremap { namespace wookie {
 
-storage::storage(elliptics::logger &log, const std::string &ns) :
+storage::storage(const elliptics::logger &log, const std::string &ns) :
 	elliptics::node(log),
 	m_namespace(ns) {
 }
@@ -33,7 +33,7 @@ elliptics::data_pointer storage::pack_document(const std::string &url, const std
 	dnet_current_time(&doc.ts);
 
 	msgpack::sbuffer buffer;
-	msgpack::pack(&buffer, d);
+	msgpack::pack(&buffer, doc);
 
 	return elliptics::data_pointer::copy(buffer.data(), buffer.size());
 }

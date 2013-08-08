@@ -12,7 +12,7 @@ namespace ioremap { namespace wookie {
 
 class storage : public elliptics::node {
 	public:
-		explicit storage(elliptics::logger &log, const std::string &ns);
+		explicit storage(const elliptics::logger &log, const std::string &ns);
 
 		void set_groups(const std::vector<int> groups);
 
