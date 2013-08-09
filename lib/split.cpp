@@ -1,4 +1,4 @@
-#include "../include/wookie/split.hpp"
+#include "wookie/split.hpp"
 
 namespace ioremap { namespace wookie {
 

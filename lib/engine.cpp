@@ -1,7 +1,7 @@
-#include "../include/wookie/engine.hpp"
-#include "../include/wookie/storage.hpp"
-#include "../include/wookie/dmanager.hpp"
-#include "../include/wookie/parser.hpp"
+#include "wookie/engine.hpp"
+#include "wookie/storage.hpp"
+#include "wookie/dmanager.hpp"
+#include "wookie/parser.hpp"
 
 #include <mutex>
 #include <magic.h>
