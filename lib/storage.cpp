@@ -2,7 +2,7 @@
 
 namespace ioremap { namespace wookie {
 
-storage::storage(elliptics::logger &log, const std::string &ns) :
+storage::storage(const elliptics::logger &log, const std::string &ns) :
 	elliptics::node(log),
 	m_namespace(ns) {
 }

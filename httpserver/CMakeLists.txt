@@ -3,6 +3,7 @@ target_link_libraries(wookie_http
 	elliptics-thevoid
 	wookie
 	wookie_stem
+	${MSGPACK_LIBRARIES}
 	${THEVOID_LIBRARIES}
 	${SWARM_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}

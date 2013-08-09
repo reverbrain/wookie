@@ -25,7 +25,11 @@ typedef std::map<std::string, boost::shared_ptr<stem> > mstem_t;
 
 class split {
 	public:
-		split() {}
+		split() {
+			boost::locale::generator gen;
+			m_loc = gen("en_US.UTF8");
+		}
+
 		mpos_t feed(const std::string &text, std::vector<std::string> &tokens) {
 			std::vector<std::string> strs;
 			boost::split(strs, text, boost::is_any_of(m_split_string));
@@ -36,7 +40,7 @@ class split {
 			int pos = 0;
 			for (std::vector<std::string>::iterator it = strs.begin(); it != strs.end(); ++it) {
 				std::string token = it->data();
-				token = boost::locale::to_lower(token);
+				token = boost::locale::to_lower(token, m_loc);
 
 				if (!token.size())
 					continue;
@@ -74,6 +78,7 @@ class split {
 
 	private:
 		static const std::string m_split_string;
+		std::locale m_loc;
 
 		const char *lang_detect(const char *data, const int length) {
 			bool is_plain_text = true;

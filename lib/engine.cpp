@@ -441,11 +441,6 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 		return -1;
 	}
 
-	// What is it? Why do we need another locale?
-	boost::locale::generator gen;
-	std::locale loc = gen("en_US.UTF8");
-	std::locale::global(loc);
-
 	m_data->storage->set_groups(groups);
 
 	m_data->downloader.reset(new wookie::dmanager(url_threads_count));
