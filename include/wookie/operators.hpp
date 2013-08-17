@@ -68,8 +68,12 @@ class operators {
 						bool quote_ok = false;
 						for (auto p : pos) {
 #if 0
-							std::cout << "state: " << state << ", prev-pos: " << prev_pos << ", pos: " << p.first <<
-										 ", p-index: " << *p.second << ", should-be: " << id_indexes[state] << std::endl;
+							std::cout << "state: " << state <<
+								", prev-pos: " << prev_pos <<
+								", pos: " << p.first <<
+								", p-index: " << *p.second <<
+								", should-be: " << id_indexes[state] <<
+								std::endl;
 #endif
 							if (state < indexes.size()) {
 								if (!memcmp(p.second, &id_indexes[state], sizeof(struct dnet_raw_id))) {
@@ -130,6 +134,7 @@ class operators {
 				std::unique_lock<std::mutex> guard(lock);
 				this->result = result;
 				this->err = err;
+				ready = true;
 				cond.notify_all();
 			}
 		};
