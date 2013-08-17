@@ -426,9 +426,10 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 
 		groups.clear();
 
-		std::istringstream iss(group_string);
-		std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
-			       std::back_inserter<std::vector<int>>(groups), digitizer());
+		std::vector<std::string> gr;
+		boost::split(gr, group_string, boost::is_any_of(":"));
+
+		std::transform(gr.begin(), gr.end(), std::back_inserter<std::vector<int>>(groups), digitizer());
 	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
