@@ -81,8 +81,9 @@ int main(int argc, char *argv[])
 	wookie::engine engine;
 
 	engine.add_options("RIndex options")
-		("find", value<std::string>(&find), "Find pages containing all tokens (space separated)")
+		("find", value<std::string>(&find), "Find pages containing all tokens (space separated, supports quotes for exact match)")
 		("url", value<std::string>(&url), "Url to download")
+		("json", "Output json with pages content which contain requested tokens")
 	;
 
 	try {
@@ -104,12 +105,32 @@ int main(int argc, char *argv[])
 	try {
 		if (find.size()) {
 			ioremap::wookie::operators op(*engine.get_storage());
-			std::vector<dnet_raw_id> results;
-			results = op.find(find);
+			std::vector<dnet_raw_id> find_results = op.find(find);
 
-			std::cout << "Found documents: " << std::endl;
-			for (auto && r : results) {
-				std::cout << r << std::endl;
+			if (!find_results.size()) {
+				std::cerr << "No documents found, request: " << find << std::endl;
+				return -ENOENT;
+			}
+
+			if (vm.count("json") == 0) {
+				std::cout << "Found documents: " << std::endl;
+				for (auto && r : find_results) {
+					std::cout << r << std::endl;
+				}
+			} else {
+				elliptics::session sess = engine.get_storage()->create_session();
+
+				sess.set_ioflags(DNET_IO_FLAGS_CACHE);
+
+				std::vector<elliptics::key> keys;
+				std::copy(find_results.begin(), find_results.end(), std::back_inserter(keys));
+				auto read_results = sess.bulk_read(keys).get();
+
+				std::cout << "bulk read: requested ids: " << find_results.size() <<
+					", found documents: " << read_results.size() <<
+					std::endl;
+
+				std::cout << read_results[0].file().to_string() << std::endl;
 			}
 		} else {
 			engine.add_filter(wookie::create_text_filter());
