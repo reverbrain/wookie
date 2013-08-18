@@ -32,14 +32,16 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 	thevoid::elliptics::JsonValue m_result_object;
 
 	/*
-	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class without this ugly hack,
-	 * thevoid::elliptics::io::on_upload<T> in this case, which in turn doesn't have needed members and declarations
+	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class
+	 * without this ugly hack, thevoid::elliptics::io::on_upload<T> in this case,
+	 * which in turn doesn't have needed members and declarations
 	 *
 	 * This hack casts shared pointer to the base class to shared pointer to child class. 
 	 */
 	std::shared_ptr<on_upload> shared_from_this()
 	{
-		return std::static_pointer_cast<on_upload>(thevoid::elliptics::io::on_upload<T>::shared_from_this());
+		return std::static_pointer_cast<on_upload>(
+				thevoid::elliptics::io::on_upload<T>::shared_from_this());
 	}
 
 	virtual void on_request(const swarm::network_request &req, const boost::asio::const_buffer &buffer) {
@@ -53,8 +55,8 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		m_doc.key = query_list.item_value("name");
 
 		sess.write_data(m_doc.key, std::move(storage::pack_document(m_doc)), 0)
-				.connect(std::bind(&on_upload<T>::on_write_finished_update_index, this->shared_from_this(),
-							std::placeholders::_1, std::placeholders::_2));
+				.connect(std::bind(&on_upload<T>::on_write_finished_update_index,
+					this->shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 	}
 
 	virtual void on_write_finished_update_index(const ioremap::elliptics::sync_write_result &result,
@@ -72,11 +74,12 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		if (ids.size()) {
 			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, m_result_object);
 
-			std::cout << m_doc.ts << ": rindex update ... url: " << m_doc.key << ": indexes: " << ids.size() << std::endl;
+			std::cout << m_doc.ts << ": rindex update ... url: " << m_doc.key <<
+				": indexes: " << ids.size() << std::endl;
 			ioremap::elliptics::session sess = this->get_server()->create_session();
 			sess.set_indexes(m_doc.key, ids, objs)
-				.connect(std::bind(&on_upload<T>::on_index_update_finished, this->shared_from_this(),
-							std::placeholders::_1, std::placeholders::_2));
+				.connect(std::bind(&on_upload<T>::on_index_update_finished,
+					this->shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 		} else {
 			this->on_write_finished(result, error);
 		}
@@ -165,8 +168,10 @@ public:
 		return *m_storage;
 	}
 
-	struct on_search  : public ioremap::thevoid::simple_request_stream<http_server>, public std::enable_shared_from_this<on_search> {
-		virtual void on_request(const swarm::network_request &req, const boost::asio::const_buffer &buffer) {
+	struct on_search  : public ioremap::thevoid::simple_request_stream<http_server>,
+			    public std::enable_shared_from_this<on_search> {
+		virtual void on_request(const swarm::network_request &req,
+				const boost::asio::const_buffer &buffer) {
 			using namespace std::placeholders;
 
 			(void) buffer;
@@ -174,11 +179,9 @@ public:
 			ioremap::swarm::network_url url(req.get_url());
 			ioremap::swarm::network_query_list query(url.query());
 
-			log(ioremap::swarm::LOG_INFO, "query: %s\n", url.query().c_str());
-
 			if (auto text = query.try_item("text")) {
 				ioremap::wookie::operators op(get_server()->get_storage());
-				shared_find_t fobj = op.find(*text, std::bind(&on_search::on_search_finished, shared_from_this(), _1, _2));
+				shared_find_t fobj = op.find(*text);
 			} else {
 				send_reply(ioremap::swarm::network_reply::bad_request);
 			}
