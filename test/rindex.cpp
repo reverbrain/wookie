@@ -23,12 +23,10 @@ struct rindex_processor
 	basic_elliptics_splitter m_splitter;
 
 	rindex_processor(wookie::engine &engine, const std::string &base, bool fallback)
-		: engine(engine), base(base), fallback(fallback)
-	{
+		: engine(engine), base(base), fallback(fallback) {
 	}
 
-	void process(const std::string &url, const std::string &content, const dnet_time &ts, const std::string &base_index)
-	{
+	void process(const std::string &url, const std::string &content, const dnet_time &ts, const std::string &base_index) {
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
@@ -56,8 +54,7 @@ struct rindex_processor
 		}
 	}
 
-	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback)
-	{
+	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback) {
 		ioremap::swarm::network_url base_url;
 		std::string base;
 
