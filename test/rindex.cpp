@@ -8,7 +8,11 @@
 
 #include <boost/program_options.hpp>
 
+#include "thevoid/elliptics/jsonvalue.hpp"
+#include "thevoid/elliptics/index.hpp"
+
 using namespace ioremap;
+using namespace ioremap::wookie;
 
 struct rindex_processor
 {
@@ -16,7 +20,7 @@ struct rindex_processor
 	std::string base;
 	bool fallback;
 
-	wookie::basic_elliptics_splitter m_splitter;
+	basic_elliptics_splitter m_splitter;
 
 	rindex_processor(wookie::engine &engine, const std::string &base, bool fallback)
 		: engine(engine), base(base), fallback(fallback)
@@ -36,11 +40,11 @@ struct rindex_processor
 		}
 	}
 
-	void process_text(const ioremap::swarm::network_reply &reply, wookie::document_type) {
+	void process_text(const ioremap::swarm::network_reply &reply, document_type) {
 		struct dnet_time ts;
 		dnet_current_time(&ts);
 
-		wookie::parser p;
+		parser p;
 		if (!fallback)
 			p.parse(reply.get_data());
 
@@ -52,7 +56,7 @@ struct rindex_processor
 		}
 	}
 
-	static wookie::process_functor create(wookie::engine &engine, const std::string &url, bool fallback)
+	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback)
 	{
 		ioremap::swarm::network_url base_url;
 		std::string base;
@@ -104,18 +108,19 @@ int main(int argc, char *argv[])
 
 	try {
 		if (find.size()) {
-			ioremap::wookie::operators op(*engine.get_storage());
-			std::vector<dnet_raw_id> find_results = op.find(find);
+			operators op(*engine.get_storage());
+			auto find_result = op.find(find);
 
-			if (!find_results.size()) {
-				std::cerr << "No documents found, request: " << find << std::endl;
+			const std::vector<dnet_raw_id> &ids = find_result->results_array();
+
+			std::cout << "Found " << ids.size() << " documents for request: " << find << std::endl;
+			if (!ids.size())
 				return -ENOENT;
-			}
 
 			if (vm.count("json") == 0) {
-				std::cout << "Found documents: " << std::endl;
-				for (auto && r : find_results) {
-					std::cout << r << std::endl;
+				char tmp_str[DNET_ID_SIZE * 2 + 1];
+				for (auto && r : ids) {
+					std::cout << dnet_dump_id_len_raw(r.id, DNET_ID_SIZE, tmp_str) << std::endl;
 				}
 			} else {
 				elliptics::session sess = engine.get_storage()->create_session();
@@ -123,19 +128,36 @@ int main(int argc, char *argv[])
 				sess.set_ioflags(DNET_IO_FLAGS_CACHE);
 
 				std::vector<elliptics::key> keys;
-				std::copy(find_results.begin(), find_results.end(), std::back_inserter(keys));
+				std::copy(ids.begin(), ids.end(), std::back_inserter(keys));
 				auto read_results = sess.bulk_read(keys).get();
 
-				std::cout << "bulk read: requested ids: " << find_results.size() <<
-					", found documents: " << read_results.size() <<
-					std::endl;
+				struct document_unpacker {
+					const std::string operator () (const elliptics::data_pointer &data) {
+						document doc = storage::unpack_document(data);
+						return doc.key;
+					}
+				};
 
-				std::cout << read_results[0].file().to_string() << std::endl;
+				struct index_unpacker {
+					const std::string operator () (const elliptics::data_pointer &data) {
+						index_data idata(data);
+
+						std::stringstream result;
+						std::copy(idata.pos.begin(), idata.pos.end(), std::ostream_iterator<int>(result, " "));
+						return result.str();
+					}
+				};
+
+				thevoid::elliptics::JsonValue result_object;
+				thevoid::elliptics::index::find_serializer::pack_indexes_json(result_object, read_results, document_unpacker(),
+						find_result->results_find_indexes_array(), index_unpacker(), find_result->index_map());
+
+				std::cout << result_object.ToString() << std::endl;
 			}
 		} else {
-			engine.add_filter(wookie::create_text_filter());
-			engine.add_url_filter(wookie::create_domain_filter(url));
-			engine.add_parser(wookie::create_href_parser());
+			engine.add_filter(create_text_filter());
+			engine.add_url_filter(create_domain_filter(url));
+			engine.add_parser(create_href_parser());
 			engine.add_processor(rindex_processor::create(engine, url, false));
 			engine.add_fallback_processor(rindex_processor::create(engine, url, true));
 

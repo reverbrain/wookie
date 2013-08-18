@@ -12,189 +12,65 @@
 
 namespace ioremap { namespace wookie {
 
-class operators {
-	private:
-		struct find_request {
-			std::vector<std::string> quotes;
-			std::vector<std::vector<std::string>> quotes_tokens;
-			std::vector<std::vector<dnet_raw_id>> quotes_indexes;
-			std::string text;
-			std::vector<std::string> text_tokens;
-			std::map<std::string, dnet_raw_id> mapper;
-		};
-
-		struct find_functor
-		{
-			find_request request;
-			std::function<void (const std::vector<dnet_raw_id> &, const elliptics::error_info &err)> handler;
-
-			void on_result_ready(const elliptics::sync_find_indexes_result &result, const elliptics::error_info &err)
-			{
-				if (err || result.empty()) {
-					handler(std::vector<dnet_raw_id>(), err);
-					return;
-				}
-
-				std::vector<dnet_raw_id> indexes;
-				std::vector<dnet_raw_id> tmp = document_ids(result);
-				std::vector<dnet_raw_id> results;
-
-				for (auto it = result.begin(); it != result.end(); ++it) {
-					const elliptics::find_indexes_result_entry &entry = *it;
-
-					std::map<int, const dnet_raw_id *> pos;
-
-					for (auto && index : entry.indexes) {
-						index_data idata(index.data);
-
-						for (auto p : idata.pos)
-							pos.insert(std::make_pair(p, &index.index));
-					}
-
-					bool all_quotes_ok = true;
-
-					for (size_t quote_index = 0; quote_index < request.quotes_tokens.size(); ++quote_index) {
-						const std::vector<std::string> &indexes_strings = request.quotes_tokens[quote_index];
-						const std::vector<dnet_raw_id> &id_indexes = request.quotes_indexes[quote_index];
-						indexes.resize(indexes_strings.size());
-						tmp.clear();
-
-						for (size_t i = 0; i < indexes.size(); ++i) {
-							indexes[i] = request.mapper[indexes_strings[i]];
-						}
-
-						size_t state = 0;
-						int prev_pos = -1;
-						bool quote_ok = false;
-						for (auto p : pos) {
-#if 0
-							std::cout << "state: " << state <<
-								", prev-pos: " << prev_pos <<
-								", pos: " << p.first <<
-								", p-index: " << *p.second <<
-								", should-be: " << id_indexes[state] <<
-								std::endl;
-#endif
-							if (state < indexes.size()) {
-								if (!memcmp(p.second, &id_indexes[state], sizeof(struct dnet_raw_id))) {
-									if (prev_pos == -1) {
-										prev_pos = p.first;
-										state++;
-									} else if (p.first == prev_pos + 1) {
-										state++;
-										prev_pos++;
-									} else {
-										prev_pos = -1;
-										state = 0;
-									}
-								} else {
-									prev_pos = -1;
-									state = 0;
-
-									if (!memcmp(p.second, &id_indexes[state], sizeof(struct dnet_raw_id))) {
-										prev_pos = p.first;
-										state++;
-									}
-								}
-							}
-
-							if (state == indexes.size()) {
-								state = 0;
-								prev_pos = -1;
-
-								tmp.push_back(entry.id);
-								quote_ok = true;
-								//std::cout << "good document id: " << entry.id << std::endl;
-								break;
-							}
-						}
-
-						all_quotes_ok &= quote_ok;
-					}
-
-					if (all_quotes_ok)
-						results.push_back(entry.id);
-				}
-
-				handler(results, elliptics::error_info());
-			}
-		};
-
-		struct waiter
-		{
-			waiter() : ready(false) {}
-
-			bool ready;
-			std::condition_variable cond;
-			std::mutex lock;
-			std::vector<dnet_raw_id> result;
-			elliptics::error_info err;
-
-			void on_result(const std::vector<dnet_raw_id> &result, const elliptics::error_info &err) {
-				std::unique_lock<std::mutex> guard(lock);
-				this->result = result;
-				this->err = err;
-				ready = true;
-				cond.notify_all();
-			}
-		};
-
+class find_result {
 	public:
-		operators(storage &st) :
-		m_st(st) {
+		typedef std::function<void (find_result &result, const elliptics::error_info &err)> find_completion_callback_t;
+
+		find_result(storage &st, const std::string &text) : m_ready(false), m_st(st) {
+			m_completion = std::bind(&find_result::on_wait_completion, this, std::placeholders::_1, std::placeholders::_2);
+			find(text);
+
+			std::unique_lock<std::mutex> guard(m_lock);
+			while (!m_ready)
+				m_cond.wait(guard);
+
+			m_error.throw_error();
 		}
 
-		void find(const std::function<void (const std::vector<dnet_raw_id> &, const elliptics::error_info &)> &handler, const std::string &text) {
-			using namespace std::placeholders;
-
-			std::shared_ptr<find_functor> functor = std::make_shared<find_functor>();
-			functor->handler = handler;
-
-			auto &request = functor->request;
-			request = prepare(text);
-			std::vector<std::string> indexes;
-
-			for (size_t i = 0; i < request.quotes.size(); ++i) {
-				auto new_indexes = prepare_indexes(request.quotes[i], request.quotes_tokens[i]);
-				request.quotes_indexes[i] = m_st.transform_tokens(new_indexes);
-				indexes.insert(indexes.end(), new_indexes.begin(), new_indexes.end());
-			}
-
-			auto new_indexes = prepare_indexes(request.text, request.text_tokens);
-			indexes.insert(indexes.end(), new_indexes.begin(), new_indexes.end());
-
-			std::sort(new_indexes.begin(), new_indexes.end());
-			new_indexes.erase(std::unique(new_indexes.begin(), new_indexes.end()), new_indexes.end());
-
-			auto session = m_st.create_session();
-
-			for (auto it = new_indexes.begin(); it != new_indexes.end(); ++it) {
-				elliptics::key id(*it);
-				id.transform(session);
-
-				request.mapper[*it] = id.raw_id();
-			}
-
-			session.find_all_indexes(new_indexes).connect(std::bind(&find_functor::on_result_ready, functor, _1, _2));
+		find_result(storage &st, const std::string &text, const find_completion_callback_t &callback) : m_ready(false), m_st(st), m_completion(callback) {
+			find(text);
 		}
 
-		std::vector<dnet_raw_id> find(const std::string &text) {
-			using namespace std::placeholders;
+		const std::vector<dnet_raw_id> &results_array() const {
+			return m_result_ids;
+		}
 
-			waiter w;
-			find(std::bind(&waiter::on_result, &w, _1, _2), text);
+		const elliptics::sync_find_indexes_result &results_find_indexes_array() const {
+			return m_find_result;
+		}
 
-			std::unique_lock<std::mutex> guard(w.lock);
-			while (!w.ready)
-				w.cond.wait(guard);
-
-			w.err.throw_error();
-			return w.result;
+		const elliptics::id_to_name_map_t &index_map() const {
+			return m_map;
 		}
 
 	private:
+		bool m_ready;
 		storage &m_st;
 		wookie::split m_spl;
+
+		find_completion_callback_t m_completion;
+
+		std::condition_variable m_cond;
+		std::mutex m_lock;
+		elliptics::error_info m_error;
+		elliptics::sync_find_indexes_result m_find_result;
+		std::vector<dnet_raw_id> m_result_ids;
+		elliptics::id_to_name_map_t m_map;
+
+		struct quote {
+			std::string 			text;
+			std::vector<std::string>	tokens;
+			std::vector<dnet_raw_id>	indexes;
+
+			quote(const std::string &txt) : text(txt) {}
+		};
+
+		struct find_request {
+			std::vector<quote> quotes;
+			std::string text;
+			std::vector<std::string> text_tokens;
+			elliptics::name_to_id_map_t mapper;
+		} m_request;
 
 		find_request prepare(const std::string &text) {
 			find_request res;
@@ -208,25 +84,8 @@ class operators {
 			return res;
 		}
 
-		static std::vector<dnet_raw_id> document_ids(const std::vector<elliptics::find_indexes_result_entry> &objs) {
-			std::vector<dnet_raw_id> results;
-
-			for (auto && entry : objs) {
-				//std::cout << "document id: " << entry.id << std::endl;
-				results.emplace_back(entry.id);
-			}
-
-			return std::move(results);
-		}
-
-		std::vector<std::string> prepare_indexes(const std::string &text, std::vector<std::string> &tokens) {
-			wookie::mpos_t pos = m_spl.feed(text, tokens);
-
-			std::vector<std::string> indexes;
-			std::transform(pos.begin(), pos.end(), std::back_inserter(indexes),
-					std::bind(&mpos_t::value_type::first, std::placeholders::_1));
-
-			return std::move(indexes);
+		void prepare_indexes(const std::string &text, std::vector<std::string> &tokens) {
+			m_spl.feed(text, tokens);
 		}
 
 		struct operators_found {
@@ -262,6 +121,150 @@ class operators {
 					negative.push_back(pos);
 			}
 		};
+
+		void find(const std::string &text) {
+			using namespace std::placeholders;
+
+			m_request = prepare(text);
+			std::vector<std::string> str_indexes;
+
+			// run over all quoted strings
+			for (auto qit = m_request.quotes.begin(); qit != m_request.quotes.end(); ++qit) {
+				prepare_indexes(qit->text, qit->tokens);
+				str_indexes.insert(str_indexes.end(), qit->tokens.begin(), qit->tokens.end());
+
+				qit->indexes = m_st.transform_tokens(qit->tokens);
+			}
+
+			// grab tokens from the rest of request (unquoted text)
+			prepare_indexes(m_request.text, m_request.text_tokens);
+			str_indexes.insert(str_indexes.end(), m_request.text_tokens.begin(), m_request.text_tokens.end());
+
+			std::sort(str_indexes.begin(), str_indexes.end());
+			str_indexes.erase(std::unique(str_indexes.begin(), str_indexes.end()), str_indexes.end());
+
+			auto session = m_st.create_session();
+
+			for (auto it = str_indexes.begin(); it != str_indexes.end(); ++it) {
+				elliptics::key id(*it);
+				id.transform(session);
+
+				m_request.mapper[*it] = id.raw_id();
+				m_map[id.raw_id()] = *it;
+			}
+
+			session.find_all_indexes(str_indexes).connect(std::bind(&find_result::on_result_ready, this, _1, _2));
+		}
+
+		void on_result_ready(const elliptics::sync_find_indexes_result &result, const elliptics::error_info &err) {
+			if (err || result.empty()) {
+				m_completion(*this, err);
+				return;
+			}
+
+			m_find_result = result;
+
+			for (auto it = result.begin(); it != result.end(); ++it) {
+				const elliptics::find_indexes_result_entry &entry = *it;
+
+				// position to token ID (its pointer) map
+				std::map<int, const dnet_raw_id *> pos;
+
+				for (const auto & index : entry.indexes) {
+					// unpack index data - this will contain array or token positions in the document
+					index_data idata(index.data);
+
+					for (const auto & p : idata.pos)
+						pos.insert(std::make_pair(p, &index.index));
+				}
+
+				bool all_quotes_ok = true;
+
+				for (auto qit = m_request.quotes.begin(); qit != m_request.quotes.end(); ++qit) {
+					size_t state = 0;
+					int prev_pos = -1;
+					bool quote_ok = false;
+					for (auto p : pos) {
+#if 0
+						std::cout << "state: " << state <<
+							", prev-pos: " << prev_pos <<
+							", pos: " << p.first <<
+							", p-index: " << *p.second <<
+							", should-be: " << id_indexes[state] <<
+							std::endl;
+#endif
+						if (state < qit->tokens.size()) {
+							if (!memcmp(p.second, &qit->indexes[state], sizeof(struct dnet_raw_id))) {
+								if (prev_pos == -1) {
+									prev_pos = p.first;
+									state++;
+								} else if (p.first == prev_pos + 1) {
+									state++;
+									prev_pos++;
+								} else {
+									prev_pos = -1;
+									state = 0;
+								}
+							} else {
+								prev_pos = -1;
+								state = 0;
+
+								// check again the first index in quote
+								if (!memcmp(p.second, &qit->indexes[state], sizeof(struct dnet_raw_id))) {
+									prev_pos = p.first;
+									state++;
+								}
+							}
+						}
+
+						if (state == qit->tokens.size()) {
+							state = 0;
+							prev_pos = -1;
+
+							quote_ok = true;
+							//std::cout << "good document id: " << entry.id << std::endl;
+							break;
+						}
+					}
+
+					all_quotes_ok &= quote_ok;
+				}
+
+				if (all_quotes_ok)
+					m_result_ids.push_back(entry.id);
+			}
+
+			m_completion(*this, elliptics::error_info());
+		}
+
+		void on_wait_completion(find_result &, const elliptics::error_info &err) {
+			std::unique_lock<std::mutex> guard(m_lock);
+			m_error = err;
+			m_ready = true;
+			m_cond.notify_all();
+		}
+};
+
+typedef std::shared_ptr<find_result> shared_find_t;
+
+class operators {
+	public:
+		operators(storage &st) :
+		m_st(st) {
+		}
+
+		shared_find_t find(const std::string &text) {
+			shared_find_t fobj = std::make_shared<find_result>(m_st, text);
+			return fobj;
+		}
+
+		shared_find_t find(const std::string &text, const find_result::find_completion_callback_t &complete) {
+			shared_find_t fobj = std::make_shared<find_result>(m_st, text, complete);
+			return fobj;
+		}
+
+	private:
+		storage &m_st;
 };
 
 

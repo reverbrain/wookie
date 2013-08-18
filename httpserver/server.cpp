@@ -178,13 +178,13 @@ public:
 
 			if (auto text = query.try_item("text")) {
 				ioremap::wookie::operators op(get_server()->get_storage());
-				op.find(std::bind(&on_search::on_search_finished, shared_from_this(), _1, _2), *text);
+				shared_find_t fobj = op.find(*text, std::bind(&on_search::on_search_finished, shared_from_this(), _1, _2));
 			} else {
 				send_reply(ioremap::swarm::network_reply::bad_request);
 			}
 		}
 
-		void on_search_finished(const std::vector<dnet_raw_id> &result, const ioremap::elliptics::error_info &err) {
+		void on_search_finished(wookie::find_result &fobj, const ioremap::elliptics::error_info &err) {
 			if (err) {
 				log(ioremap::swarm::LOG_ERROR, "Failed to search: %s", err.message().c_str());
 				send_reply(ioremap::swarm::network_reply::service_unavailable);
@@ -196,9 +196,10 @@ public:
 			rapidjson::Value indexes;
 			indexes.SetArray();
 
-			for (size_t i = 0; i < result.size(); ++i) {
+			auto ids = fobj.results_array();
+			for (size_t i = 0; i < ids.size(); ++i) {
 				char id_str[2 * DNET_ID_SIZE + 1];
-				dnet_dump_id_len_raw(result[i].id, DNET_ID_SIZE, id_str);
+				dnet_dump_id_len_raw(ids[i].id, DNET_ID_SIZE, id_str);
 				rapidjson::Value index(id_str, result_object.GetAllocator());
 				indexes.PushBack(index, result_object.GetAllocator());
 			}
