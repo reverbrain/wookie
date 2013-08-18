@@ -2,6 +2,7 @@
 #include "wookie/storage.hpp"
 #include "wookie/dmanager.hpp"
 #include "wookie/parser.hpp"
+#include "wookie/lexical_cast.hpp"
 
 #include <mutex>
 #include <magic.h>
@@ -102,6 +103,36 @@ url_filter_functor create_domain_filter(const std::string &url)
 		}
 	};
 	return std::bind(&filter::check, std::make_shared<filter>(url), std::placeholders::_1, std::placeholders::_2);
+}
+
+url_filter_functor create_port_filter(const std::vector<int> &ports)
+{
+	struct filter
+	{
+		std::vector<int> allowed_ports;
+
+		filter(const std::vector<int> &ports) : allowed_ports(ports) {
+		}
+
+		bool check(const std::string &url) {
+			std::string::size_type pos = url.find(":");
+			if (pos == std::string::npos)
+				return true;
+			if (pos == url.size() - 1)
+				return true;
+
+			int port = atoi(url.c_str() + pos + 1);
+
+			for (auto it = allowed_ports.begin(); it != allowed_ports.end(); ++it) {
+				if (*it == port)
+					return true;
+			}
+
+			return false;
+		}
+	};
+
+	return std::bind(&filter::check, std::make_shared<filter>(ports), std::placeholders::_2);
 }
 
 parser_functor create_href_parser()
@@ -307,7 +338,10 @@ public:
 		document old_doc = inflight_erase(reply.get_request().get_url());
 
 		if (reply.get_error()) {
-			std::cout << "Error ... " << reply.get_url() << ": " << reply.get_error() << std::endl;
+			std::cout << "Error  ... " << reply.get_request().get_url();
+			if (reply.get_url() != reply.get_request().get_url())
+				std::cout << " -> " << reply.get_url();
+			std::cout << ": " << reply.get_error() << std::endl;
 			return;
 		}
 

@@ -25,6 +25,7 @@ typedef std::function<void (const swarm::network_reply &reply, document_type typ
 
 filter_functor create_text_filter();
 url_filter_functor create_domain_filter(const std::string &url);
+url_filter_functor create_port_filter(const std::vector<int> &ports);
 parser_functor create_href_parser();
 
 class engine
