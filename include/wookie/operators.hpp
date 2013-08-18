@@ -14,10 +14,13 @@ namespace ioremap { namespace wookie {
 
 class find_result {
 	public:
-		typedef std::function<void (find_result &result, const elliptics::error_info &err)> find_completion_callback_t;
+		typedef std::function<void (find_result &result, const elliptics::error_info &err)>
+			find_completion_callback_t;
 
-		find_result(storage &st, const std::string &text) : m_ready(false), m_st(st) {
-			m_completion = std::bind(&find_result::on_wait_completion, this, std::placeholders::_1, std::placeholders::_2);
+		find_result(storage &st, const std::string &text) :
+		m_ready(false), m_st(st) {
+			m_completion = std::bind(&find_result::on_wait_completion, this,
+					std::placeholders::_1, std::placeholders::_2);
 			find(text);
 
 			std::unique_lock<std::mutex> guard(m_lock);
@@ -27,7 +30,8 @@ class find_result {
 			m_error.throw_error();
 		}
 
-		find_result(storage &st, const std::string &text, const find_completion_callback_t &callback) : m_ready(false), m_st(st), m_completion(callback) {
+		find_result(storage &st, const std::string &text, const find_completion_callback_t &callback) :
+		m_ready(false), m_st(st), m_completion(callback) {
 			find(text);
 		}
 
@@ -138,7 +142,8 @@ class find_result {
 
 			// grab tokens from the rest of request (unquoted text)
 			prepare_indexes(m_request.text, m_request.text_tokens);
-			str_indexes.insert(str_indexes.end(), m_request.text_tokens.begin(), m_request.text_tokens.end());
+			str_indexes.insert(str_indexes.end(),
+					m_request.text_tokens.begin(), m_request.text_tokens.end());
 
 			std::sort(str_indexes.begin(), str_indexes.end());
 			str_indexes.erase(std::unique(str_indexes.begin(), str_indexes.end()), str_indexes.end());
@@ -153,10 +158,12 @@ class find_result {
 				m_map[id.raw_id()] = *it;
 			}
 
-			session.find_all_indexes(str_indexes).connect(std::bind(&find_result::on_result_ready, this, _1, _2));
+			session.find_all_indexes(str_indexes).connect(
+					std::bind(&find_result::on_result_ready, this, _1, _2));
 		}
 
-		void on_result_ready(const elliptics::sync_find_indexes_result &result, const elliptics::error_info &err) {
+		void on_result_ready(const elliptics::sync_find_indexes_result &result,
+				const elliptics::error_info &err) {
 			if (err || result.empty()) {
 				m_completion(*this, err);
 				return;
@@ -171,7 +178,8 @@ class find_result {
 				std::map<int, const dnet_raw_id *> pos;
 
 				for (const auto & index : entry.indexes) {
-					// unpack index data - this will contain array or token positions in the document
+					// unpack index data - this will contain array of
+					// token positions in the document
 					index_data idata(index.data);
 
 					for (const auto & p : idata.pos)
@@ -194,7 +202,8 @@ class find_result {
 							std::endl;
 #endif
 						if (state < qit->tokens.size()) {
-							if (!memcmp(p.second, &qit->indexes[state], sizeof(struct dnet_raw_id))) {
+							if (!memcmp(p.second, &qit->indexes[state],
+										sizeof(struct dnet_raw_id))) {
 								if (prev_pos == -1) {
 									prev_pos = p.first;
 									state++;
@@ -210,7 +219,8 @@ class find_result {
 								state = 0;
 
 								// check again the first index in quote
-								if (!memcmp(p.second, &qit->indexes[state], sizeof(struct dnet_raw_id))) {
+								if (!memcmp(p.second, &qit->indexes[state],
+										sizeof(struct dnet_raw_id))) {
 									prev_pos = p.first;
 									state++;
 								}
@@ -258,7 +268,8 @@ class operators {
 			return fobj;
 		}
 
-		shared_find_t find(const std::string &text, const find_result::find_completion_callback_t &complete) {
+		shared_find_t find(const std::string &text,
+				const find_result::find_completion_callback_t &complete) {
 			shared_find_t fobj = std::make_shared<find_result>(m_st, text, complete);
 			return fobj;
 		}

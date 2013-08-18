@@ -13,8 +13,8 @@
  * GNU General Public License for more details.
  */
 
-#include <thevoid/elliptics/server.hpp>
 #include <thevoid/elliptics/jsonvalue.hpp>
+#include <thevoid/elliptics/server.hpp>
 
 #include "wookie/storage.hpp"
 #include "wookie/basic_elliptics_splitter.hpp"
@@ -74,8 +74,9 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		if (ids.size()) {
 			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, m_result_object);
 
-			std::cout << m_doc.ts << ": rindex update ... url: " << m_doc.key <<
-				": indexes: " << ids.size() << std::endl;
+			thevoid::simple_request_stream<T>::log(ioremap::swarm::LOG_INFO,
+					"rindex update: time: %s, url: '%s', index-number: %zd",
+					dnet_print_time(&m_doc.ts), m_doc.key.c_str(), ids.size());
 			ioremap::elliptics::session sess = this->get_server()->create_session();
 			sess.set_indexes(m_doc.key, ids, objs)
 				.connect(std::bind(&on_upload<T>::on_index_update_finished,
