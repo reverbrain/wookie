@@ -76,7 +76,7 @@ std::vector<dnet_raw_id> storage::transform_tokens(const std::vector<std::string
 
 	for (auto t : tokens) {
 		s.transform(t, id);
-		results.push_back(id);
+		results.emplace_back(id);
 	}
 
 	return std::move(results);
