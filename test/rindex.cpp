@@ -167,8 +167,14 @@ int main(int argc, char *argv[])
 				std::cout << result_object.ToString() << std::endl;
 			}
 		} else {
+			int allowed_ports_array[] = {80, 8080};
+
+			std::vector<int> allowed_ports;
+			allowed_ports.assign(allowed_ports_array, allowed_ports_array + ARRAY_SIZE(allowed_ports_array));
+
 			engine.add_filter(create_text_filter());
 			engine.add_url_filter(create_domain_filter(url));
+			engine.add_url_filter(create_port_filter(allowed_ports));
 			engine.add_parser(create_href_parser());
 			engine.add_processor(rindex_processor::create(engine, url, false));
 			engine.add_fallback_processor(rindex_processor::create(engine, url, true));
