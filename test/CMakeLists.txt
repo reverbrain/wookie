@@ -5,16 +5,11 @@ add_executable(wookie_rindex_test rindex.cpp)
 target_link_libraries(wookie_rindex_test
 	wookie
 	wookie_stem
-	${Boost_PROGRAM_OPTIONS_LIBRARY}
-	${Boost_LOCALE_LIBRARY}
-	${elliptics_cpp_LIBRARY}
-	${cld_LIBRARIES}
-	${LIBEV_LIBRARIES}
 	${SWARM_LIBRARIES}
-	${LIBXML2_LIBRARIES}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
 	${LIBMAGIC_LIBRARIES}
+	${Boost_LIBRARIES}
 )
 
 add_executable(wookie_document_reader document_reader.cpp)
