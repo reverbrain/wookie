@@ -36,6 +36,21 @@ struct rindex_processor
 			std::cout << "Rindex update ... url: " << url << ": indexes: " << ids.size() << std::endl;
 			engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
 		}
+
+		document doc;
+
+		doc.ts = ts;
+		doc.key = url;
+		doc.data = content;
+
+		elliptics::data_pointer ptr = storage::pack_document(doc);
+
+		elliptics::session sess = engine.get_storage()->create_session();
+
+		std::string ns = "text";
+		sess.set_namespace(ns.c_str(), ns.size());
+
+		sess.write_data(doc.key, ptr, 0).wait();
 	}
 
 	void process_text(const ioremap::swarm::network_reply &reply, document_type) {
