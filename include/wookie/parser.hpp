@@ -53,6 +53,7 @@ class parser {
 			if (m_process_flag <= 0)
 				return;
 
+			m_text.write("|", 1);
 			m_text.write(reinterpret_cast<const char *>(ch), len);
 		}
 
