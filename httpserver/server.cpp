@@ -150,7 +150,7 @@ public:
 	virtual bool initialize(const rapidjson::Value &config) {
 		ioremap::thevoid::elliptics_server::initialize(config);
 		set_logger(get_logger_impl());
-		m_storage.reset(new storage(get_node().get_log(), ""));
+		m_storage.reset(new storage(create_session()));
 
 		on<on_get<http_server>>("/get");
 		on<on_upload<http_server>>("/upload");

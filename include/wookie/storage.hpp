@@ -10,11 +10,12 @@
 
 namespace ioremap { namespace wookie {
 
-class storage : public elliptics::node {
+class storage {
 	public:
-		explicit storage(const elliptics::logger &log, const std::string &ns);
+		explicit storage(const elliptics::session &sess);
 
 		void set_groups(const std::vector<int> groups);
+        void set_namespace(const std::string &ns);
 
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<std::string> &indexes);
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<dnet_raw_id> &indexes);
@@ -31,11 +32,11 @@ class storage : public elliptics::node {
 		std::vector<dnet_raw_id> transform_tokens(const std::vector<std::string> &tokens);
 
 		elliptics::session create_session(void);
+        elliptics::node get_node();
 
 	private:
-		std::vector<int> m_groups;
+        elliptics::session m_sess;
 		wookie::split m_spl;
-		std::string m_namespace;
 };
 
 }}

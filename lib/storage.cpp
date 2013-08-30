@@ -2,13 +2,18 @@
 
 namespace ioremap { namespace wookie {
 
-storage::storage(const elliptics::logger &log, const std::string &ns) :
-	elliptics::node(log),
-	m_namespace(ns) {
+storage::storage(const elliptics::session &sess) : m_sess(sess.clone()) {
+	m_sess.set_exceptions_policy(elliptics::session::no_exceptions);
+	m_sess.set_ioflags(DNET_IO_FLAGS_CACHE);
+	m_sess.set_timeout(1000);
 }
 
 void storage::set_groups(const std::vector<int> groups) {
-	m_groups = groups;
+	m_sess.set_groups(groups);
+}
+
+void storage::set_namespace(const std::string &ns) {
+	m_sess.set_namespace(ns.c_str(), ns.size());
 }
 
 std::vector<elliptics::find_indexes_result_entry> storage::find(const std::vector<std::string> &indexes) {
@@ -68,7 +73,7 @@ document storage::read_document(const elliptics::key &key) {
 }
 
 std::vector<dnet_raw_id> storage::transform_tokens(const std::vector<std::string> &tokens) {
-	elliptics::session s(*this);
+	elliptics::session s = create_session();
 	std::vector<dnet_raw_id> results;
 
 	results.reserve(tokens.size());
@@ -83,18 +88,12 @@ std::vector<dnet_raw_id> storage::transform_tokens(const std::vector<std::string
 }
 
 elliptics::session storage::create_session(void) {
-	elliptics::session s(*this);
+	return m_sess.clone();
+}
 
-	s.set_groups(m_groups);
-
-	if (m_namespace.size())
-		s.set_namespace(m_namespace.c_str(), m_namespace.size());
-
-	s.set_exceptions_policy(elliptics::session::no_exceptions);
-	s.set_ioflags(DNET_IO_FLAGS_CACHE);
-	s.set_timeout(1000);
-
-	return s;
+elliptics::node storage::get_node()
+{
+	return m_sess.get_node();
 }
 
 }}

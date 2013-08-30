@@ -467,10 +467,12 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
-	m_data->storage.reset(new wookie::storage(log, ns));
+	elliptics::node node(log, ns);
+	elliptics::session sess(node);
+	m_data->storage.reset(new wookie::storage(sess));
 
 	try {
-		m_data->storage->add_remote(remote.c_str());
+		m_data->storage->get_node().add_remote(remote.c_str());
 	} catch (const elliptics::error &e) {
 		std::cerr << "Could not connect to " << remote << ": " << e.what() << std::endl;
 		return -1;
