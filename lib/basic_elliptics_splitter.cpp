@@ -38,7 +38,6 @@ void basic_elliptics_splitter::process(const std::string &key, const std::string
 		for (auto &t : tokens) {
 			(m_tokens[t])++;
 		}
-		std::cout << std::endl;
 
 		for (auto && p : pos) {
 			ids.emplace_back(std::move(p.first));
