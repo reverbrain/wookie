@@ -20,18 +20,23 @@
 #include <wookie/document.hpp>
 #include <wookie/split.hpp>
 
+#include <atomic>
+
 namespace ioremap { namespace wookie {
 
 class basic_elliptics_splitter {
 	public:
-		basic_elliptics_splitter();
+		basic_elliptics_splitter() {}
+		basic_elliptics_splitter(const std::string &path) : m_splitter(path) {}
+		~basic_elliptics_splitter();
 
-		void process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> ids, std::vector<elliptics::data_pointer> objs);
+		void process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
 		void process(const std::string &key, const std::string &content, const dnet_time &ts, const std::string &base_index,
-				std::vector<std::string> ids, std::vector<elliptics::data_pointer> objs);
+				std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
 
 	private:
 		wookie::split m_splitter;
+		std::map<std::string, std::atomic_int> m_tokens;
 };
 
 }} // namespace ioremap::wookie

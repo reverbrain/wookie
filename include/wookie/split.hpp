@@ -7,6 +7,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/locale.hpp>
 
+#include <warp/lex.hpp>
+
 /*
  * None knows, but compact-language-detector does not work without it
  */
@@ -25,36 +27,40 @@ typedef std::map<std::string, boost::shared_ptr<stem> > mstem_t;
 
 class split {
 	public:
-		split() {
-			boost::locale::generator gen;
-			m_loc = gen("en_US.UTF8");
+		split() : m_loc(m_gen("en_US.UTF8")), m_lex(m_loc), m_lex_loaded(false) {}
+		split(const std::string &path) : split() {
+			if (path.size()) {
+				m_lex.load(path);
+				m_lex_loaded = true;
+			}
 		}
 
 		mpos_t feed(const std::string &text, std::vector<std::string> &tokens) {
-			std::vector<std::string> strs;
-			boost::split(strs, text, boost::is_any_of(m_split_string));
+			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
+			wmap.rule(lb::word_any);
 
 			mpos_t mpos;
 			mstem_t stems;
 
 			int pos = 0;
-			for (std::vector<std::string>::iterator it = strs.begin(); it != strs.end(); ++it) {
-				std::string token = it->data();
-				token = boost::locale::to_lower(token, m_loc);
+			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+				std::string token = boost::locale::to_lower(it->str(), m_loc);
 
-				if (!token.size())
-					continue;
-
-				const char *lang = lang_detect(token.data(), token.size());
-
-				mstem_t::iterator stem_it = stems.find(lang);
-				if (stem_it == stems.end()) {
-					boost::shared_ptr<stem> st(new stem(lang, NULL));
-					stems.insert(std::make_pair(lang, st));
-
-					token = st->get(token.data(), token.size());
+				std::string tmp = m_lex.root(token);
+				if (tmp.size()) {
+					token = tmp;
 				} else {
-					token = stem_it->second->get(token.data(), token.size());
+					const char *lang = lang_detect(token.data(), token.size());
+
+					mstem_t::iterator stem_it = stems.find(lang);
+					if (stem_it == stems.end()) {
+						boost::shared_ptr<stem> st(new stem(lang, NULL));
+						stems.insert(std::make_pair(lang, st));
+
+						token = st->get(token.data(), token.size());
+					} else {
+						token = stem_it->second->get(token.data(), token.size());
+					}
 				}
 
 				if (token.size()) {
@@ -78,11 +84,14 @@ class split {
 
 	private:
 		static const std::string m_split_string;
+		boost::locale::generator m_gen;
 		std::locale m_loc;
+		ioremap::warp::lex m_lex;
+		bool m_lex_loaded;
 
 		const char *lang_detect(const char *data, const int length) {
 			bool is_plain_text = true;
-			bool do_allow_extended_languages = true;
+			bool do_allow_extended_languages = false;
 			bool do_pick_summary_language = false;
 			bool do_remove_weak_matches = false;
 			bool is_reliable;

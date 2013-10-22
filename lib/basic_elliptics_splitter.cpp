@@ -19,17 +19,26 @@
 using namespace ioremap;
 using namespace ioremap::wookie;
 
-basic_elliptics_splitter::basic_elliptics_splitter()
+basic_elliptics_splitter::~basic_elliptics_splitter()
 {
+	for (const auto &t: m_tokens) {
+		std::cout << t.first << ": " << t.second << std::endl;
+	}
 }
 
 void basic_elliptics_splitter::process(const std::string &key, const std::string &content, const dnet_time &ts, const std::string &base_index,
-				std::vector<std::string> ids, std::vector<elliptics::data_pointer> objs)
+				std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs)
 {
 	// each reverse index contains wookie::index_data object for every key stored
 	if (content.size()) {
 		std::vector<std::string> tokens;
 		wookie::mpos_t pos = m_splitter.feed(content, tokens);
+
+		std::cout << "split: key: " << key << ", tokens: " << tokens.size() << ", positions: " << pos.size() << std::endl;
+		for (auto &t : tokens) {
+			(m_tokens[t])++;
+		}
+		std::cout << std::endl;
 
 		for (auto && p : pos) {
 			ids.emplace_back(std::move(p.first));
@@ -49,7 +58,7 @@ void basic_elliptics_splitter::process(const std::string &key, const std::string
 	}
 }
 
-void basic_elliptics_splitter::process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> ids, std::vector<elliptics::data_pointer> objs)
+void basic_elliptics_splitter::process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs)
 {
 	process(doc.key, doc.data, doc.ts, base_index, ids, objs);
 }
