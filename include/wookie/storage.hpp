@@ -15,7 +15,7 @@ class storage {
 		explicit storage(const elliptics::session &sess);
 
 		void set_groups(const std::vector<int> groups);
-        void set_namespace(const std::string &ns);
+        	void set_namespace(const std::string &ns);
 
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<std::string> &indexes);
 		std::vector<elliptics::find_indexes_result_entry> find(const std::vector<dnet_raw_id> &indexes);
@@ -32,10 +32,10 @@ class storage {
 		std::vector<dnet_raw_id> transform_tokens(const std::vector<std::string> &tokens);
 
 		elliptics::session create_session(void);
-        elliptics::node get_node();
+		elliptics::node get_node();
 
 	private:
-        elliptics::session m_sess;
+		elliptics::session m_sess;
 		wookie::split m_spl;
 };
 
