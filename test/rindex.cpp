@@ -87,6 +87,30 @@ struct rindex_processor
 	}
 };
 
+url_filter_functor create_words_filter(const std::vector<std::string> &forbidden_words)
+{
+	struct filter
+	{
+		std::vector<std::string> forbidden_words;
+
+		filter(const std::vector<std::string> &forbidden_words) : forbidden_words(forbidden_words) {
+		}
+
+		bool check(const std::string &url) {
+			for (auto &w : forbidden_words) {
+				std::string::size_type pos = url.find(w);
+				if ((pos != std::string::npos) && (pos != url.size() - 1))
+					return false;
+			}
+
+			return true;
+		}
+	};
+
+	return std::bind(&filter::check, std::make_shared<filter>(forbidden_words), std::placeholders::_2);
+}
+
+
 int main(int argc, char *argv[])
 {
 	using namespace boost::program_options;
@@ -174,8 +198,12 @@ int main(int argc, char *argv[])
 			std::vector<int> allowed_ports;
 			allowed_ports.assign(allowed_ports_array, allowed_ports_array + ARRAY_SIZE(allowed_ports_array));
 
+			std::vector<std::string> forbidden_words;
+			forbidden_words.push_back("/blog");
+
 			engine.add_filter(create_text_filter());
 			engine.add_url_filter(create_domain_filter(url));
+			engine.add_url_filter(create_words_filter(forbidden_words));
 			engine.add_url_filter(create_port_filter(allowed_ports));
 			engine.add_parser(create_href_parser());
 			engine.add_processor(rindex_processor::create(engine, url, false, lex_path));
