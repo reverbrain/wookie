@@ -467,9 +467,12 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
-	elliptics::node node(log, ns);
+	elliptics::node node(log);
 	elliptics::session sess(node);
 	m_data->storage.reset(new wookie::storage(sess));
+
+	if (ns.size())
+		m_data->storage->set_namespace(ns);
 
 	try {
 		m_data->storage->get_node().add_remote(remote.c_str());
