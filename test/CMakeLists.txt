@@ -21,3 +21,13 @@ target_link_libraries(wookie_document_reader
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
 )
+
+add_executable(wookie_data_iterator iterator.cpp)
+target_link_libraries(wookie_data_iterator
+	wookie
+	${Boost_PROGRAM_OPTIONS_LIBRARY}
+	${elliptics_cpp_LIBRARY}
+	${elliptics_client_LIBRARY}
+	${MSGPACK_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
+)
