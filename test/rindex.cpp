@@ -58,6 +58,7 @@ struct rindex_processor
 		dnet_current_time(&ts);
 
 		parser p;
+		// fallback is a processor which handles replies which are forbidden by filters
 		if (!fallback)
 			p.parse(reply.get_data());
 
