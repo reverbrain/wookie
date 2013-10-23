@@ -26,7 +26,8 @@ int main(int argc, char *argv[])
 		("url", value<std::string>(&url), "Fetch object from storage by URL")
 		("text", "Iterate over text objects, not HTML")
 		("msgpack-input", value<std::string>(&msgin), "Path to Zaliznyak dictionary in msgpacked format")
-		("grammar", value<std::string>(&gram), "Grammar string suitable for ioremap::warp::parser, space separates single word descriptions")
+		("grammar", value<std::string>(&gram), "Grammar string suitable for ioremap::warp::parser, "
+		 "space separates single word descriptions, '-' used to separate 'negative' features: S,им,мн-сокр,кр")
 	;
 
 	try {
@@ -91,7 +92,7 @@ int main(int argc, char *argv[])
 		std::istringstream iss(gram);
 		std::copy(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), std::back_inserter<std::vector<std::string>>(tokens));
 
-		std::vector<ioremap::warp::parsed_word::feature_mask> vgram = l.generate(tokens);
+		std::vector<ioremap::warp::grammar> vgram = l.generate(tokens);
 
 		for (const auto &b : bres) {
 			wookie::document doc = wookie::storage::unpack_document(b.file());
@@ -110,7 +111,7 @@ int main(int argc, char *argv[])
 					words.push_back(boost::locale::to_lower(it->str(), loc));
 				}
 
-				for (auto pos : l.grammar(vgram, words)) {
+				for (auto pos : l.grammar_deduction(vgram, words)) {
 					for (size_t i = 0; i < vgram.size(); ++i) {
 						std::cout << words[i + pos] << " ";
 					}
