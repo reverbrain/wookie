@@ -17,7 +17,7 @@
 #ifndef WOOKIE_ENGINE_HPP
 #define WOOKIE_ENGINE_HPP
 
-#include <swarm/networkrequest.h>
+#include <swarm/urlfetcher/url_fetcher.hpp>
 #include <boost/program_options.hpp>
 
 #include <wookie/document.hpp>
@@ -34,10 +34,10 @@ enum document_type
 	document_update
 };
 
-typedef std::function<std::vector<std::string> (const swarm::network_reply &reply)> parser_functor;
-typedef std::function<bool (const swarm::network_reply &reply)> filter_functor;
-typedef std::function<bool (const swarm::network_reply &reply, const std::string &url)> url_filter_functor;
-typedef std::function<void (const swarm::network_reply &reply, document_type type)> process_functor;
+typedef std::function<std::vector<std::string> (const swarm::url_fetcher::response &reply, const std::string &)> parser_functor;
+typedef std::function<bool (const swarm::url_fetcher::response &reply, const std::string &)> filter_functor;
+typedef std::function<bool (const swarm::url_fetcher::response &reply, const swarm::url &url)> url_filter_functor;
+typedef std::function<void (const swarm::url_fetcher::response &reply, const std::string &, document_type type)> process_functor;
 
 filter_functor create_text_filter();
 url_filter_functor create_domain_filter(const std::string &url);
@@ -68,7 +68,7 @@ public:
 
 	int parse_command_line(int argc, char **argv, boost::program_options::variables_map &vm);
 
-	void download(const std::string &url);
+	void download(const swarm::url &url);
 	void found_in_page_cache(const std::string &url, const document &doc);
 
 	int run();

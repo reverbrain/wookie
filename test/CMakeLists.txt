@@ -20,6 +20,7 @@ target_link_libraries(wookie_document_reader
 	${elliptics_client_LIBRARY}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
+	-pthread
 )
 
 add_executable(wookie_data_iterator iterator.cpp)
@@ -30,4 +31,5 @@ target_link_libraries(wookie_data_iterator
 	${elliptics_client_LIBRARY}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
+	-pthread
 )

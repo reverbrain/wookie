@@ -69,38 +69,37 @@ struct rindex_processor
 		sess.write_data(doc.key, ptr, 0).wait();
 	}
 
-	void process_text(const ioremap::swarm::network_reply &reply, document_type) {
+	void process_text(const ioremap::swarm::url_fetcher::response &reply, const std::string &data, document_type) {
 		struct dnet_time ts;
 		dnet_current_time(&ts);
 
 		parser p;
 		// fallback is a processor which handles replies which are forbidden by filters
 		if (!fallback)
-			p.parse(reply.get_data());
+			p.parse(data);
 
 		try {
-			process(reply.get_url(), p.text(), ts, base + ".collection");
+			process(reply.url().to_string(), p.text(), ts, base + ".collection");
 		} catch (const std::exception &e) {
-			std::cerr << reply.get_url() << ": index processing exception: " << e.what() << std::endl;
-			engine.download(reply.get_request().get_url());
+			std::cerr << reply.url().to_string() << ": index processing exception: " << e.what() << std::endl;
+			engine.download(reply.request().url());
 		}
 	}
 
 	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback, const std::string &lex_path) {
-		ioremap::swarm::network_url base_url;
-		std::string base;
-
-		if (!base_url.set_base(url))
+		ioremap::swarm::url base_url = url;
+		if (!base_url.is_valid())
 			ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': set-base failed", url.c_str());
 
-		base = base_url.host();
+		std::string base = base_url.host();
 		if (base.empty())
 			ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': base is empty", url.c_str());
 
 		return std::bind(&rindex_processor::process_text,
 			std::make_shared<rindex_processor>(engine, base, fallback, lex_path),
 			std::placeholders::_1,
-			std::placeholders::_2);
+			std::placeholders::_2,
+			std::placeholders::_3);
 	}
 };
 
@@ -113,10 +112,11 @@ url_filter_functor create_words_filter(const std::vector<std::string> &forbidden
 		filter(const std::vector<std::string> &forbidden_words) : forbidden_words(forbidden_words) {
 		}
 
-		bool check(const std::string &url) {
+		bool check(const swarm::url &url) {
+			const std::string url_string = url.to_string();
 			for (auto &w : forbidden_words) {
-				std::string::size_type pos = url.find(w);
-				if ((pos != std::string::npos) && (pos != url.size() - 1))
+				std::string::size_type pos = url_string.find(w);
+				if ((pos != std::string::npos) && (pos != url_string.size() - 1))
 					return false;
 			}
 
@@ -210,10 +210,7 @@ int main(int argc, char *argv[])
 				std::cout << result_object.ToString() << std::endl;
 			}
 		} else {
-			int allowed_ports_array[] = {80, 8080};
-
-			std::vector<int> allowed_ports;
-			allowed_ports.assign(allowed_ports_array, allowed_ports_array + ARRAY_SIZE(allowed_ports_array));
+			std::vector<int> allowed_ports = { 80, 8080 };
 
 			std::vector<std::string> forbidden_words;
 			forbidden_words.push_back("/blog");

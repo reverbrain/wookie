@@ -17,9 +17,10 @@
 #ifndef __WOOKIE_DOWNLOAD_HPP
 #define __WOOKIE_DOWNLOAD_HPP
 
-#include <swarm/networkmanager.h>
-#include <swarm/url_finder.h>
-#include <swarm/network_url.h>
+#include <swarm/urlfetcher/url_fetcher.hpp>
+#include <swarm/urlfetcher/ev_event_loop.hpp>
+#include <swarm/xml/url_finder.hpp>
+#include <swarm/url.hpp>
 #include <elliptics/session.hpp>
 
 #define EV_MULTIPLICITY		1
@@ -39,7 +40,7 @@ namespace ioremap { namespace wookie {
 
 class downloader {
 	public:
-		downloader() :  m_async(m_loop), m_manager(m_loop), m_thread(std::bind(&downloader::crawl, this)) {
+		downloader() :  m_swarm_loop(m_loop), m_async(m_loop), m_manager(m_swarm_loop, m_logger), m_thread(std::bind(&downloader::crawl, this)) {
 		}
 
 		~downloader() {
@@ -47,15 +48,17 @@ class downloader {
 			m_thread.join();
 		}
 
-		void enqueue(const ioremap::swarm::network_request &request,
-				const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
-			m_manager.get(handler, request);
+		void enqueue(ioremap::swarm::url_fetcher::request &&request,
+				const ioremap::swarm::simple_stream::handler_func &handler) {
+			m_manager.get(std::make_shared<ioremap::swarm::simple_stream>(handler), std::move(request));
 		}
 
 	private:
+        swarm::logger m_logger;
 		ev::dynamic_loop	m_loop;
+        swarm::ev_event_loop m_swarm_loop;
 		ev::async		m_async;
-		ioremap::swarm::network_manager m_manager;
+		ioremap::swarm::url_fetcher m_manager;
 		std::thread		m_thread;
 
 		std::atomic_long m_counter, m_prev_counter;
@@ -89,18 +92,20 @@ class dmanager {
 			m_loop.loop();
 		}
 
-		void feed(const std::string &url, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
-			ioremap::swarm::network_request request;
-			prepare_request(url, request);
-			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
+		void feed(const swarm::url &url, const ioremap::swarm::simple_stream::handler_func &handler) {
+			ioremap::swarm::url_fetcher::request request;
+            request.set_follow_location(true);
+            request.set_url(url);
+			m_downloaders[rand() % m_downloaders.size()].enqueue(std::move(request), handler);
 		}
 
-		void feed(const std::string &url, const document &doc, const std::function<void (const ioremap::swarm::network_reply &reply)> &handler) {
-			ioremap::swarm::network_request request;
-			prepare_request(url, request);
-			request.set_if_modified_since(doc.ts.tsec);
+		void feed(const swarm::url &url, const document &doc, const ioremap::swarm::simple_stream::handler_func &handler) {
+			ioremap::swarm::url_fetcher::request request;
+            request.set_follow_location(true);
+            request.set_url(url);
+			request.headers().set_if_modified_since(doc.ts.tsec);
 
-			m_downloaders[rand() % m_downloaders.size()].enqueue(request, handler);
+			m_downloaders[rand() % m_downloaders.size()].enqueue(std::move(request), handler);
 		}
 
 	private:
@@ -110,17 +115,6 @@ class dmanager {
 
 		void signal_received(ev::sig &sig, int ) {
 			sig.loop.break_loop();
-		}
-
-		void prepare_request(const std::string &url, ioremap::swarm::network_request &request) {
-			ioremap::swarm::network_url url_parser;
-			url_parser.set_base(url);
-			std::string normalized_url = url_parser.normalized();
-			if (normalized_url.empty())
-				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': URL can not be normilized", url.c_str());
-
-			request.set_follow_location(true);
-			request.set_url(normalized_url);
 		}
 };
 

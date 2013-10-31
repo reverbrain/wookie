@@ -65,29 +65,19 @@ filter_functor create_text_filter()
 	{
 		magic_data magic;
 
-		bool check(const swarm::network_reply &reply)
+		bool check(const swarm::url_fetcher::response &reply, const std::string &data)
 		{
-			bool text = false;
-			bool has_content_type = false;
-			for (auto h : reply.get_headers()) {
-				if (h.first == "Content-Type") {
-					std::cout << h.second << std::endl;
+			if (auto content_type = reply.headers().content_type()) {
+				std::cout << *content_type << std::endl;
 
-					text = !strncmp(h.second.c_str(), "text/", 5);
-					has_content_type = true;
-					break;
-				}
+				return content_type->compare(0, 5, "text/", 5) == 0;
+			} else {
+				return magic.is_text(data.c_str(), data.size());
 			}
-
-			if (!has_content_type) {
-				text = magic.is_text(reply.get_data().c_str(), reply.get_data().size());
-			}
-
-			return text;
 		}
 	};
 
-	return std::bind(&filter::check, std::make_shared<filter>(), std::placeholders::_1);
+	return std::bind(&filter::check, std::make_shared<filter>(), std::placeholders::_1, std::placeholders::_2);
 }
 
 url_filter_functor create_domain_filter(const std::string &url)
@@ -96,26 +86,16 @@ url_filter_functor create_domain_filter(const std::string &url)
 	{
 		std::string base_host;
 
-		filter(const std::string &url)
+		filter(const ioremap::swarm::url &url)
 		{
-			ioremap::swarm::network_url base_url;
-
-			if (!base_url.set_base(url))
-				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': set-base failed", url.c_str());
-
-			base_host = base_url.host();
+			base_host = url.host();
 			if (base_host.empty())
-				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': base is empty", url.c_str());
+				ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': base is empty", url.to_string().c_str());
 		}
 
-		bool check(const swarm::network_reply &reply, const std::string &url)
+		bool check(const swarm::url_fetcher::response &reply, const swarm::url &url)
 		{
-			std::string host;
-			ioremap::swarm::network_url base_url;
-			base_url.set_base(reply.get_url());
-			base_url.relative(url, &host);
-
-			return base_host == host;
+			return base_host == reply.url().resolved(url).host();
 		}
 	};
 	return std::bind(&filter::check, std::make_shared<filter>(url), std::placeholders::_1, std::placeholders::_2);
@@ -130,21 +110,13 @@ url_filter_functor create_port_filter(const std::vector<int> &ports)
 		filter(const std::vector<int> &ports) : allowed_ports(ports) {
 		}
 
-		bool check(const std::string &url) {
-			std::string::size_type pos = url.find(":");
-			if (pos == std::string::npos)
-				return true;
-			if (pos == url.size() - 1)
-				return true;
-
-			int port = atoi(url.c_str() + pos + 1);
-
-			for (auto it = allowed_ports.begin(); it != allowed_ports.end(); ++it) {
-				if (*it == port)
-					return true;
+		bool check(const swarm::url &url) {
+			if (auto port = url.port()) {
+				auto it = std::find(allowed_ports.begin(), allowed_ports.end(), *port);
+				return it != allowed_ports.end();
 			}
 
-			return false;
+			return true;
 		}
 	};
 
@@ -155,10 +127,12 @@ parser_functor create_href_parser()
 {
 	struct parser
 	{
-		std::vector<std::string> operator() (const swarm::network_reply &reply)
+		std::vector<std::string> operator() (const swarm::url_fetcher::response &reply, const std::string &data)
 		{
+			(void) reply;
+
 			wookie::parser p;
-			p.parse(reply.get_data());
+			p.parse(data);
 
 			return p.urls();
 		}
@@ -192,40 +166,37 @@ public:
 		dnet_current_time(&generation_time);
 	}
 
-	void download(const std::string &url) {
-		std::cout << "Downloading ... " << url << std::endl;
-		downloader->feed(url, std::bind(&engine_data::process_url, this, std::placeholders::_1));
+	void download(const swarm::url &url) {
+		std::cout << "Downloading ... " << url.to_string() << std::endl;
+		using namespace std::placeholders;
+		downloader->feed(url, std::bind(&engine_data::process_url, this, _1, _2, _3));
 	}
 
-	void found_in_page_cache(const std::string &url, const document &doc) {
-		std::cout << "Downloading (if-modified-since " << doc.ts << ") ... " << url << std::endl;
+	void found_in_page_cache(const swarm::url &url, const document &doc) {
+		std::cout << "Downloading (if-modified-since " << doc.ts << ") ... " << url.to_string() << std::endl;
 		inflight_insert(url, doc);
-		downloader->feed(url, doc, std::bind(&engine_data::process_url, this, std::placeholders::_1));
+		using namespace std::placeholders;
+		downloader->feed(url, doc, std::bind(&engine_data::process_url, this, _1, _2, _3));
 	}
 
-	bool inflight_insert(const std::string &url, const document &doc) {
+	bool inflight_insert(const swarm::url &url, const document &doc) {
+		const std::string url_string = url.to_string();
+
 		std::unique_lock<std::mutex> guard(inflight_lock);
-
-		auto check = inflight.find(url);
-		if (check == inflight.end()) {
-			inflight.insert(std::make_pair(url, doc));
-			return true;
-		} else {
-			check->second = doc;
-		}
-
-		return false;
+		return inflight.insert(std::make_pair(url_string, doc)).second;
 	}
 
-	bool inflight_insert(const std::string &url) {
+	bool inflight_insert(const swarm::url &url) {
 		return inflight_insert(url, document());
 	}
 
-	document inflight_erase(const std::string &url) {
+	document inflight_erase(const swarm::url &url) {
 		document d;
 
+		const std::string url_string = url.to_string();
+
 		std::unique_lock<std::mutex> guard(inflight_lock);
-		auto check = inflight.find(url);
+		auto check = inflight.find(url_string);
 		if (check != inflight.end()) {
 			d = check->second;
 			inflight.erase(check);
@@ -234,29 +205,29 @@ public:
 		return d;
 	}
 
-	ioremap::elliptics::async_write_result store_document(const std::string &url, const std::string &content, const dnet_time &ts) {
+	ioremap::elliptics::async_write_result store_document(const swarm::url &url, const std::string &content, const dnet_time &ts) {
 		wookie::document d;
 		d.ts = ts;
-		d.key = url;
+		d.key = url.to_string();
 		d.data = content;
 
 		return storage->write_document(d);
 	}
 
-	void process_reply(const swarm::network_reply &reply) {
-		std::cout << "Processing  ... " << reply.get_request().get_url();
-		if (reply.get_url() != reply.get_request().get_url())
-			std::cout << " -> " << reply.get_url();
+	void process_reply(const swarm::url_fetcher::response &reply, const std::string &data) {
+		std::cout << "Processing  ... " << reply.request().url().to_string();
+		if (reply.url().to_string() != reply.request().url().to_string())
+			std::cout << " -> " << reply.url().to_string();
 
-		std::cout << ", code: " << reply.get_code() <<
+		std::cout << ", code: " << reply.code() <<
 			     ", total-urls: " << total <<
-			     ", data-size: " << reply.get_data().size() <<
-			     ", headers: " << reply.get_headers().size() <<
+			     ", data-size: " << data.size() <<
+			     ", headers: " << reply.headers().all().size() <<
 			     std::endl;
 
 		bool accepted_by_filters = true;
 		for (auto it = filters.begin(); accepted_by_filters && it != filters.end(); ++it) {
-			accepted_by_filters &= (*it)(reply);
+			accepted_by_filters &= (*it)(reply, data);
 		}
 
 		++total;
@@ -265,41 +236,48 @@ public:
 		struct dnet_time ts;
 		dnet_current_time(&ts);
 
-		res.emplace_back(store_document(reply.get_url(), reply.get_data(), ts));
+		res.emplace_back(store_document(reply.url(), data, ts));
 
 		// if original URL redirected to other location, store object by original URL too
-		if (reply.get_url() != reply.get_request().get_url())
-			res.emplace_back(store_document(reply.get_request().get_url(), reply.get_url(), ts));
+		if (reply.url().to_string() != reply.request().url().to_string())
+			res.emplace_back(store_document(reply.request().url(), data, ts));
 
 		if (accepted_by_filters) {
-			if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
+			if (reply.code() != ioremap::swarm::url_fetcher::response::not_modified) {
 				for (auto it = processors.begin(); it != processors.end(); ++it)
-					(*it)(reply, document_new);
+					(*it)(reply, data, document_new);
 			}
 
 			std::vector<std::string> urls;
 
 			for (auto it = parsers.begin(); it != parsers.end(); ++it) {
-				const auto new_urls = (*it)(reply);
+				const auto new_urls = (*it)(reply, data);
 				urls.insert(urls.end(), new_urls.begin(), new_urls.end());
 			}
 
 			std::sort(urls.begin(), urls.end());
 			urls.erase(std::unique(urls.begin(), urls.end()), urls.end());
 
-			swarm::network_url base_url;
-			base_url.set_base(reply.get_url());
+			const swarm::url &base_url = reply.url();
 
 			for (auto it = urls.begin(); it != urls.end(); ++it) {
-				std::string host;
-				std::string request_url = base_url.relative(*it, &host);
+				swarm::url relative_url = *it;
+				if (!relative_url.is_valid()) {
+					continue;
+				}
+
+				swarm::url request_url = base_url.resolved(relative_url);
+				if (!request_url.is_valid()) {
+					continue;
+				}
 
 				// We support only http requests
-				if ((request_url.compare(0, 6, "https:") != 0) && (request_url.compare(0, 5, "http:") != 0))
+				if (request_url.scheme() != "https" && request_url.scheme() != "http") {
 					continue;
+				}
 
 				// Skip invalid and the same urls
-				if (request_url.empty() || host.empty() || (request_url == reply.get_url()))
+				if (request_url.host().empty() || request_url.to_string() == reply.url().to_string())
 					continue;
 
 				// Check by user filters
@@ -312,26 +290,26 @@ public:
 					if (!inflight_insert(request_url))
 						continue;
 
-					auto rres = storage->read_data(request_url);
+					auto rres = storage->read_data(request_url.to_string());
 					rres.wait();
 					if (rres.error().code()) {
-						std::cout << "Page cache error (download from internet): url: " << request_url <<
+						std::cout << "Page cache error (download from internet): url: " << request_url.to_string() <<
 							", error: " << rres.error().message() << std::endl;
 						download(request_url);
 					} else {
 						document doc = storage::unpack_document(rres.get_one().file());
 						// document was stored before we started this update generation, process it again
 						int will_process = dnet_time_before(&doc.ts, &generation_time);
-						std::cout << "Url has been found in page cache: url: " << request_url <<
+						std::cout << "Url has been found in page cache: url: " << request_url.to_string() <<
 							", will process (document was saved before current engine started): " << will_process <<
 							std::endl;
 
 						if (will_process) {
 							found_in_page_cache(request_url, doc);
 
-							if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
+							if (reply.code() != ioremap::swarm::url_fetcher::response::not_modified) {
 								for (auto it = processors.begin(); it != processors.end(); ++it)
-									(*it)(reply, document_cache);
+									(*it)(reply, data, document_cache);
 							}
 						}
 					}
@@ -339,35 +317,32 @@ public:
 			}
 		} else {
 			for (auto it = fallback_processors.begin(); it != fallback_processors.end(); ++it)
-				(*it)(reply, document_new);
+				(*it)(reply, data, document_new);
 		}
 
 		for (auto && r : res) {
 			r.wait();
 			if (r.error()) {
-				std::cout << "Document storage error: " << reply.get_request().get_url() << " " << r.error().message() << std::endl;
+				std::cout << "Document storage error: " << reply.request().url().to_string() << " " << r.error().message() << std::endl;
 			}
 		}
 	}
 
-	void process_url(const swarm::network_reply &reply) {
-		document old_doc = inflight_erase(reply.get_request().get_url());
+	void process_url(const swarm::url_fetcher::response &reply, const std::string &data, const boost::system::error_code &error) {
+		document old_doc = inflight_erase(reply.request().url());
 
-		if (reply.get_error()) {
-			std::cout << "Error  ... " << reply.get_request().get_url();
-			if (reply.get_url() != reply.get_request().get_url())
-				std::cout << " -> " << reply.get_url();
-			std::cout << ": " << reply.get_error() << std::endl;
+		if (error) {
+			std::cout << "Error  ... " << reply.request().url().to_string();
+			if (reply.url().to_string() != reply.request().url().to_string())
+				std::cout << " -> " << reply.url().to_string();
+			std::cout << ": " << error.message() << std::endl;
 			return;
 		}
 
-		if (reply.get_code() != ioremap::swarm::network_reply::not_modified) {
-			process_reply(reply);
+		if (reply.code() != ioremap::swarm::url_fetcher::response::not_modified) {
+			process_reply(reply, data);
 		} else {
-			swarm::network_reply r(reply);
-
-			r.set_data(old_doc.data);
-			process_reply(r);
+			process_reply(reply, old_doc.data);
 		}
 	}
 };
@@ -504,7 +479,7 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 	return 0;
 }
 
-void engine::download(const std::string &url)
+void engine::download(const swarm::url &url)
 {
 	m_data->download(url);
 }
