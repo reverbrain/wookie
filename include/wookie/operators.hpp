@@ -143,8 +143,6 @@ class find_result {
 		};
 
 		void find(const std::string &text) {
-			using namespace std::placeholders;
-
 			m_request = prepare(text);
 			std::vector<std::string> str_indexes;
 
@@ -175,7 +173,8 @@ class find_result {
 			}
 
 			session.find_all_indexes(str_indexes).connect(
-					std::bind(&find_result::on_result_ready, this, _1, _2));
+					std::bind(&find_result::on_result_ready,
+						this, std::placeholders::_1, std::placeholders::_2));
 		}
 
 		void on_result_ready(const elliptics::sync_find_indexes_result &result,
