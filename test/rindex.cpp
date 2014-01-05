@@ -24,8 +24,8 @@
 
 #include <boost/program_options.hpp>
 
-#include "thevoid/elliptics/jsonvalue.hpp"
-#include "thevoid/elliptics/index.hpp"
+#include <rift/jsonvalue.hpp>
+#include <rift/index.hpp>
 
 using namespace ioremap;
 using namespace ioremap::wookie;
@@ -198,14 +198,17 @@ int main(int argc, char *argv[])
 						index_data idata(data);
 
 						std::stringstream result;
-						std::copy(idata.pos.begin(), idata.pos.end(), std::ostream_iterator<int>(result, " "));
+						std::copy(idata.pos.begin(), idata.pos.end(),
+								std::ostream_iterator<int>(result, " "));
 						return result.str();
 					}
 				};
 
-				thevoid::elliptics::JsonValue result_object;
-				thevoid::elliptics::index::find_serializer::pack_indexes_json(result_object, read_results, document_unpacker(),
-						find_result->results_find_indexes_array(), index_unpacker(), find_result->index_map());
+				rift::JsonValue result_object;
+				rift::index::find_serializer::pack_indexes_json(
+					result_object, read_results, document_unpacker(),
+					find_result->results_find_indexes_array(),
+					index_unpacker(), find_result->index_map());
 
 				std::cout << result_object.ToString() << std::endl;
 			}
