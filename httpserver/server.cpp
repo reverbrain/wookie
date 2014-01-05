@@ -36,6 +36,19 @@ struct on_upload : public rift::io::on_upload<T>
 	document m_doc;
 	rift::JsonValue m_result_object;
 
+	/*
+	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class
+	 * without this ugly hack, rift::io::on_upload<T> in this case,
+	 * which in turn doesn't have needed members and declarations
+	 *
+	 * This hack casts shared pointer to the base class to shared pointer to child class. 
+	 */
+
+	std::shared_ptr<on_upload> shared_from_this() {
+		return std::static_pointer_cast<on_upload>(rift::io::on_upload<T>::shared_from_this());
+	}
+
+
 	virtual void on_request(const swarm::http_request &req, const boost::asio::const_buffer &buffer) {
 		const swarm::url_query &query_list = req.url().query();
 
@@ -58,7 +71,7 @@ struct on_upload : public rift::io::on_upload<T>
 					this->shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 	}
 
-	virtual void on_write_finished_update_index(const ioremap::elliptics::sync_write_result &result,
+	void on_write_finished_update_index(const ioremap::elliptics::sync_write_result &result,
 			const ioremap::elliptics::error_info &error) {
 		if (error) {
 			this->send_reply(swarm::url_fetcher::response::service_unavailable);
@@ -86,7 +99,7 @@ struct on_upload : public rift::io::on_upload<T>
 		}
 	}
 
-	virtual void on_index_update_finished(const ioremap::elliptics::sync_set_indexes_result &result,
+	void on_index_update_finished(const ioremap::elliptics::sync_set_indexes_result &result,
 			const ioremap::elliptics::error_info &error) {
 		if (error) {
 			this->send_reply(swarm::url_fetcher::response::service_unavailable);
@@ -157,7 +170,7 @@ public:
 			options::exact_match("/get"),
 			options::methods("GET")
 		);
-		on<on_upload<http_server>>(
+		on<on_upload1<http_server>>(
 			options::exact_match("/upload"),
 			options::methods("POST")
 		);
