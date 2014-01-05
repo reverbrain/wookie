@@ -18,6 +18,7 @@
 #define __WOOKIE_DOWNLOAD_HPP
 
 #include <swarm/urlfetcher/url_fetcher.hpp>
+#include <swarm/urlfetcher/stream.hpp>
 #include <swarm/urlfetcher/ev_event_loop.hpp>
 #include <swarm/xml/url_finder.hpp>
 #include <swarm/url.hpp>
@@ -54,12 +55,12 @@ class downloader {
 		}
 
 	private:
-        swarm::logger m_logger;
-		ev::dynamic_loop	m_loop;
-        swarm::ev_event_loop m_swarm_loop;
-		ev::async		m_async;
+		swarm::logger m_logger;
+		ev::dynamic_loop m_loop;
+		swarm::ev_event_loop m_swarm_loop;
+		ev::async m_async;
 		ioremap::swarm::url_fetcher m_manager;
-		std::thread		m_thread;
+		std::thread m_thread;
 
 		std::atomic_long m_counter, m_prev_counter;
 		std::shared_ptr<ev::async> m_async_exit;
@@ -69,7 +70,7 @@ class downloader {
 			m_async.set<downloader, &downloader::crawl_stop>(this);
 			m_async.start();
 
-			m_manager.set_limit(10); /* number of active connections */
+			m_manager.set_total_limit(10); /* number of active connections */
 
 			m_loop.loop();
 		}
