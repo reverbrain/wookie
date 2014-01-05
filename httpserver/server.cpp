@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#include <thevoid/elliptics/jsonvalue.hpp>
-#include <thevoid/elliptics/server.hpp>
+#include <rift/asio.hpp>
+#include <rift/common.hpp>
+#include <rift/jsonvalue.hpp>
+#include <rift/io.hpp>
+#include <rift/server.hpp>
 #include <swarm/urlfetcher/url_fetcher.hpp>
 
 #include "wookie/storage.hpp"
@@ -27,24 +30,11 @@ using namespace ioremap;
 using namespace ioremap::wookie;
 
 template <typename T>
-struct on_upload : public thevoid::elliptics::io::on_upload<T>
+struct on_upload : public rift::io::on_upload<T>
 {
 	std::string m_base_index;
 	document m_doc;
-	thevoid::elliptics::JsonValue m_result_object;
-
-	/*
-	 * this->shared_from_this() returns shared_ptr which contains pointer to the base class
-	 * without this ugly hack, thevoid::elliptics::io::on_upload<T> in this case,
-	 * which in turn doesn't have needed members and declarations
-	 *
-	 * This hack casts shared pointer to the base class to shared pointer to child class. 
-	 */
-	std::shared_ptr<on_upload> shared_from_this()
-	{
-		return std::static_pointer_cast<on_upload>(
-				thevoid::elliptics::io::on_upload<T>::shared_from_this());
-	}
+	rift::JsonValue m_result_object;
 
 	virtual void on_request(const swarm::http_request &req, const boost::asio::const_buffer &buffer) {
 		const swarm::url_query &query_list = req.url().query();
@@ -81,9 +71,10 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 		this->server()->get_splitter().process(m_doc, m_base_index, ids, objs);
 
 		if (ids.size()) {
-			thevoid::elliptics::io::on_upload<T>::fill_upload_reply(result, m_result_object, m_result_object.GetAllocator());
+			rift::io::upload_completion::fill_upload_reply(result, m_result_object,
+					m_result_object.GetAllocator());
 
-			thevoid::simple_request_stream<T>::log(ioremap::swarm::LOG_INFO,
+			thevoid::simple_request_stream<T>::log(ioremap::swarm::SWARM_LOG_INFO,
 					"rindex update: time: %s, url: '%s', index-number: %zd",
 					dnet_print_time(&m_doc.ts), m_doc.key.c_str(), ids.size());
 			ioremap::elliptics::session sess = this->server()->elliptics()->session();
@@ -116,7 +107,7 @@ struct on_upload : public thevoid::elliptics::io::on_upload<T>
 };
 
 template <typename T>
-struct on_get : public thevoid::elliptics::io::on_get<T>
+struct on_get : public rift::io::on_get<T>
 {
 	virtual void on_read_finished(const ioremap::elliptics::sync_read_result &result,
 			const ioremap::elliptics::error_info &error) {
@@ -174,11 +165,11 @@ public:
 			options::exact_match("/search"),
 			options::methods("GET")
 		);
-		on<ioremap::thevoid::elliptics::common::on_ping<http_server>>(
+		on<ioremap::rift::common::on_ping<http_server>>(
 			options::exact_match("/ping"),
 			options::methods("GET")
 		);
-		on<ioremap::thevoid::elliptics::common::on_echo<http_server>>(
+		on<ioremap::rift::common::on_echo<http_server>>(
 			options::exact_match("/echo"),
 			options::methods("GET")
 		);
@@ -215,12 +206,12 @@ public:
 
 		void on_search_finished(wookie::find_result &fobj, const ioremap::elliptics::error_info &err) {
 			if (err) {
-				log(ioremap::swarm::LOG_ERROR, "Failed to search: %s", err.message().c_str());
+				log(ioremap::swarm::SWARM_LOG_ERROR, "Failed to search: %s", err.message().c_str());
 				send_reply(ioremap::swarm::url_fetcher::response::service_unavailable);
 				return;
 			}
 
-			ioremap::thevoid::elliptics::JsonValue result_object;
+			rift::JsonValue result_object;
 
 			rapidjson::Value indexes;
 			indexes.SetArray();
@@ -245,14 +236,48 @@ public:
 		}
 	};
 
-	const ioremap::thevoid::elliptics_base *elliptics() const
+	const rift::elliptics_base *elliptics() const
 	{
 		return &m_elliptics;
 	}
 
+	void process(const swarm::http_request &request, const boost::asio::const_buffer &buffer,
+			const rift::continue_handler_t &continue_handler) const {
+		rift::bucket_meta_raw meta;
+		continue_handler(request, buffer, meta, swarm::http_response::ok);
+	}
+
+	void check_cache(const elliptics::key &, elliptics::session &) const {
+	}
+
+	bool query_ok(const swarm::http_request &request) const {
+		const auto &query = request.url().query();
+
+		if (auto name = query.item_value("name"))
+			return true;
+
+		return false;
+	}
+
+	elliptics::session extract_key(const swarm::http_request &request, const rift::bucket_meta_raw &meta,
+			elliptics::key &key) const {
+		const auto &query = request.url().query();
+
+		auto name = query.item_value("name");
+		key = *name;
+
+		elliptics::session session = m_elliptics.session();
+		session.set_namespace(meta.key.c_str(), meta.key.size());
+		session.set_groups(meta.groups);
+		session.transform(key);
+
+		return session;
+	}
+
+
 private:
 	wookie::basic_elliptics_splitter m_splitter;
-	ioremap::thevoid::elliptics_base m_elliptics;
+	rift::elliptics_base m_elliptics;
 
 	std::unique_ptr<ioremap::wookie::storage> m_storage;
 };
