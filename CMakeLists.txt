@@ -28,6 +28,7 @@ LOCATE_LIBRARY(LIBMAGIC "magic.h" "magic")
 LOCATE_LIBRARY(THEVOID "thevoid/server.hpp" "thevoid")
 LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
 LOCATE_LIBRARY(WARP "warp/lex.hpp" "")
+LOCATE_LIBRARY(WARP "rift/server.hpp" "rift")
 
 FILE(GLOB headers
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.hpp"
