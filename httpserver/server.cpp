@@ -170,7 +170,7 @@ public:
 			options::exact_match("/get"),
 			options::methods("GET")
 		);
-		on<on_upload<http_server>>(
+		on<on_upload1<http_server>>(
 			options::exact_match("/upload"),
 			options::methods("POST")
 		);
