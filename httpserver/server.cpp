@@ -49,7 +49,13 @@ struct on_upload : public rift::io::on_upload<T>
 	}
 
 
-	virtual void on_request(const swarm::http_request &req, const boost::asio::const_buffer &buffer) {
+	virtual void checked(const swarm::http_request &req, const boost::asio::const_buffer &buffer,
+			const rift::bucket_meta_raw &meta, swarm::http_response::status_type verdict) {
+		if ((verdict != swarm::http_response::ok) && !meta.noauth_all()) {
+			this->send_reply(verdict);
+			return;
+		}
+
 		const swarm::url_query &query_list = req.url().query();
 
 		ioremap::elliptics::session sess = this->server()->elliptics()->session();
@@ -170,7 +176,7 @@ public:
 			options::exact_match("/get"),
 			options::methods("GET")
 		);
-		on<on_upload1<http_server>>(
+		on<on_upload<http_server>>(
 			options::exact_match("/upload"),
 			options::methods("POST")
 		);
