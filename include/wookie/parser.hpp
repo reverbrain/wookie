@@ -18,10 +18,15 @@
 #define __WOOKIE_PARSER_HPP
 
 #include <libxml/HTMLparser.h>
+
+#include <algorithm>
+#include <cstring>
+#include <iostream>
+#include <iterator>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <cstring>
+#include <utility>
 
 namespace ioremap { namespace wookie {
 
@@ -60,6 +65,11 @@ class parser {
 
 			std::copy(m_tokens.begin(), m_tokens.end(), std::ostream_iterator<std::string>(ss, "|"));
 			return std::move(ss.str());
+		}
+
+		void reset(void) {
+			m_urls.clear();
+			m_tokens.clear();
 		}
 
 		void parser_start_element(const xmlChar *tag_name, const xmlChar **attributes) {
