@@ -27,8 +27,9 @@ basic_elliptics_splitter::~basic_elliptics_splitter()
 	}
 }
 
-void basic_elliptics_splitter::process(const std::string &key, const std::string &content, const dnet_time &ts, const std::string &base_index,
-				std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs)
+void basic_elliptics_splitter::process(const std::string &key, const std::string &content,
+		const dnet_time &ts, const std::string &base_index,
+		std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs)
 {
 	// each reverse index contains wookie::index_data object for every key stored
 	if (content.size()) {

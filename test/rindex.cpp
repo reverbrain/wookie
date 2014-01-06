@@ -42,7 +42,8 @@ struct rindex_processor
 		: engine(engine), base(base), fallback(fallback), m_splitter(lex_path) {
 	}
 
-	void process(const std::string &url, const std::string &content, const dnet_time &ts, const std::string &base_index) {
+	void process(const std::string &url, const std::string &content,
+			const dnet_time &ts, const std::string &base_index) {
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
@@ -86,7 +87,8 @@ struct rindex_processor
 		}
 	}
 
-	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback, const std::string &lex_path) {
+	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback,
+			const std::string &lex_path) {
 		ioremap::swarm::url base_url = url;
 		if (!base_url.is_valid())
 			ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': set-base failed", url.c_str());

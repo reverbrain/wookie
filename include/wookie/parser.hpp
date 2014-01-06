@@ -47,14 +47,20 @@ class parser {
 			htmlFreeParserCtxt(ctxt);
 		}
 
-		std::vector<std::string> &urls(void) {
+		const std::vector<std::string> &urls(void) const {
 			return m_urls;
 		}
 
-		const std::string text(void) const {
-			return m_text.str();
+		const std::vector<std::string> &tokens(void) const {
+			return m_tokens;
 		}
 
+		std::string text(void) const {
+			std::ostringstream ss;
+
+			std::copy(m_tokens.begin(), m_tokens.end(), std::ostream_iterator<std::string>(ss, "|"));
+			return std::move(ss.str());
+		}
 
 		void parser_start_element(const xmlChar *tag_name, const xmlChar **attributes) {
 			const char *tag = reinterpret_cast<const char*>(tag_name);
@@ -69,8 +75,7 @@ class parser {
 			if (m_process_flag <= 0)
 				return;
 
-			m_text.write("|", 1);
-			m_text.write(reinterpret_cast<const char *>(ch), len);
+			m_tokens.emplace_back(std::string(reinterpret_cast<const char *>(ch), len));
 		}
 
 		void parser_end_element(const xmlChar *tag_name) {
@@ -80,7 +85,7 @@ class parser {
 
 	private:
 		std::vector<std::string> m_urls;
-		std::ostringstream m_text;
+		std::vector<std::string> m_tokens;
 		int m_process_flag;
 
 		void update_process_flag(const char *tag, int offset) {
