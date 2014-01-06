@@ -51,6 +51,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include
 	${LIBMAGIC_INCLUDE_DIRS}
 	${THEVOID_INCLUDE_DIRS}
 	${SWARM_INCLUDE_DIRS}
+	${RIFT_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -63,6 +64,7 @@ link_directories(
 	${LIBMAGIC_LIBRARY_DIRS}
 	${THEVOID_LIBRARY_DIRS}
 	${SWARM_LIBRARY_DIRS}
+	${RIFT_LIBRARY_DIRS}
 )
 
 add_subdirectory(lib)
