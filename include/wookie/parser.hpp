@@ -36,6 +36,8 @@ class parser {
 		parser() {}
 
 		void parse(const std::string &page, const std::string &encoding) {
+			reset();
+
 			htmlParserCtxtPtr ctx;
 
 			ctx = htmlNewParserCtxt();
@@ -58,6 +60,7 @@ class parser {
 			htmlNodePtr root = xmlDocGetRootElement(doc);
 			traverse_tree(root);
 
+			htmlFreeParserCtxt(ctx);
 			xmlFreeDoc(doc);
 		}
 
@@ -76,14 +79,14 @@ class parser {
 			return std::move(ss.str());
 		}
 
+	private:
+		std::vector<std::string> m_urls;
+		std::vector<std::string> m_tokens;
+
 		void reset(void) {
 			m_urls.clear();
 			m_tokens.clear();
 		}
-
-	private:
-		std::vector<std::string> m_urls;
-		std::vector<std::string> m_tokens;
 
 		void traverse_tree(htmlNodePtr start) {
 			for (htmlNodePtr node = start; node; node = node->next) {
@@ -96,6 +99,7 @@ class parser {
 						xmlChar *data = xmlGetProp(node, (xmlChar *)"href");
 						if (data) {
 							m_urls.push_back((char *)data);
+							xmlFree(data);
 							break;
 						}
 					}
