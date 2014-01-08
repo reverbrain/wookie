@@ -17,6 +17,8 @@
 #ifndef __WOOKIE_SPLIT_HPP
 #define __WOOKIE_SPLIT_HPP
 
+#include "wookie/lang_detect.hpp"
+
 #include <string>
 
 #include <boost/algorithm/string.hpp>
@@ -24,15 +26,6 @@
 #include <boost/locale.hpp>
 
 #include <warp/lex.hpp>
-
-/*
- * None knows, but compact-language-detector does not work without it
- */
-#define CLD_WINDOWS
-
-#include "cld/compact_lang_det.h"
-#include "cld/ext_lang_enc.h"
-#include "cld/lang_enc.h"
 
 #include <stem/stem.hpp>
 
@@ -66,12 +59,12 @@ class split {
 				if (tmp.size()) {
 					token = tmp;
 				} else {
-					const char *lang = lang_detect(token.data(), token.size());
+					wookie::lang_detect ld(token.data(), token.size());
 
-					mstem_t::iterator stem_it = stems.find(lang);
+					mstem_t::iterator stem_it = stems.find(ld.lang());
 					if (stem_it == stems.end()) {
-						boost::shared_ptr<stem> st(new stem(lang, NULL));
-						stems.insert(std::make_pair(lang, st));
+						boost::shared_ptr<stem> st(new stem(ld.lang(), NULL));
+						stems.insert(std::make_pair(ld.lang(), st));
 
 						token = st->get(token.data(), token.size());
 					} else {
@@ -104,44 +97,6 @@ class split {
 		std::locale m_loc;
 		ioremap::warp::lex m_lex;
 		bool m_lex_loaded;
-
-		const char *lang_detect(const char *data, const int length) {
-			bool is_plain_text = true;
-			bool do_allow_extended_languages = false;
-			bool do_pick_summary_language = false;
-			bool do_remove_weak_matches = false;
-			bool is_reliable;
-			const char* tld_hint = NULL;
-			int encoding_hint = UNKNOWN_ENCODING;
-			Language language_hint = UNKNOWN_LANGUAGE;
-
-			double normalized_score3[3];
-			Language language3[3];
-			int percent3[3];
-			int text_bytes;
-
-			Language lang;
-			lang = CompactLangDet::DetectLanguage(0,
-					data, length,
-					is_plain_text,
-					do_allow_extended_languages,
-					do_pick_summary_language,
-					do_remove_weak_matches,
-					tld_hint,
-					encoding_hint,
-					language_hint,
-					language3,
-					percent3,
-					normalized_score3,
-					&text_bytes,
-					&is_reliable);
-
-			if (!IsValidLanguage(lang))
-				return "eng";
-
-			return LanguageCodeISO639_2(lang);
-		}
-
 };
 
 }}
