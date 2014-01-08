@@ -132,7 +132,7 @@ parser_functor create_href_parser()
 			(void) reply;
 
 			wookie::parser p;
-			p.parse(data);
+			p.parse(data, "");
 
 			return p.urls();
 		}
