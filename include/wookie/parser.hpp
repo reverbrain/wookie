@@ -69,10 +69,10 @@ class parser {
 			return m_tokens;
 		}
 
-		std::string text(void) const {
+		std::string text(const char *join) const {
 			std::ostringstream ss;
 
-			std::copy(m_tokens.begin(), m_tokens.end(), std::ostream_iterator<std::string>(ss, "|"));
+			std::copy(m_tokens.begin(), m_tokens.end(), std::ostream_iterator<std::string>(ss, join));
 			return std::move(ss.str());
 		}
 

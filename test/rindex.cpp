@@ -80,7 +80,7 @@ struct rindex_processor
 			p.parse(data, "");
 
 		try {
-			process(reply.url().to_string(), p.text(), ts, base + ".collection");
+			process(reply.url().to_string(), p.text(" "), ts, base + ".collection");
 		} catch (const std::exception &e) {
 			std::cerr << reply.url().to_string() << ": index processing exception: " << e.what() << std::endl;
 			engine.download(reply.request().url());
