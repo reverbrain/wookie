@@ -1,8 +1,10 @@
 #include "wookie/parser.hpp"
+#include "wookie/lexical_cast.hpp"
 
 #include <algorithm>
 #include <fstream>
 #include <list>
+#include <mutex>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -11,6 +13,7 @@
 #include <string.h>
 
 #include <boost/locale.hpp>
+#include <boost/program_options.hpp>
 
 using namespace ioremap;
 
@@ -191,6 +194,16 @@ class document {
 			m_hashes.assign(hashes.begin(), hashes.begin() + num);
 		}
 
+		document(const document &doc) {
+			m_hashes = doc.m_hashes;
+			m_path = doc.m_path;
+		}
+
+		document(const document &&doc) {
+			m_hashes = doc.m_hashes;
+			m_path = doc.m_path;
+		}
+
 		const std::string &name(void) const {
 			return m_path;
 		}
@@ -229,12 +242,168 @@ class document {
 		}
 };
 
+struct learn_element {
+	learn_element() : valid(true) {}
+
+	std::vector<int> docs;
+	std::string request;
+	bool valid;
+};
+
+class learner {
+	public:
+		learner(const std::string &input, const std::string &learn_file) : m_input(input) {
+			std::ifstream in(learn_file.c_str());
+
+			std::string line;
+			int line_num = 0;
+			while (std::getline(in, line)) {
+				if (!in.good())
+					break;
+
+				line_num++;
+
+				int doc[2];
+
+				int num = sscanf(line.c_str(), "%d\t%d\t", &doc[0], &doc[1]);
+				if (num != 2) {
+					fprintf(stderr, "failed to parse string: %d, tokens found: %d\n", line_num, num);
+					continue;
+				}
+
+				const char *pos = strrchr(line.c_str(), '\t');
+				if (!pos) {
+					fprintf(stderr, "could not find last tab delimiter\n");
+					continue;
+				}
+
+				pos++;
+				if (pos && *pos) {
+					learn_element le;
+
+					le.docs = std::vector<int>(doc, doc+2);
+					le.request.assign(pos);
+
+					m_elements.emplace_back(std::move(le));
+				}
+			}
+
+			add_documents(8);
+		}
+
+	private:
+		std::string m_input;
+		std::vector<learn_element> m_elements;
+
+		std::mutex m_lock;
+		std::map<int, document> m_docs;
+
+		struct doc_thread {
+			int id;
+			int step;
+		};
+
+		void load_documents(struct doc_thread &dth) {
+			document_parser parser;
+			std::map<int, document> local_docs;
+
+			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
+				learn_element &le = m_elements[i];
+
+				for (auto doc_id : le.docs) {
+					auto it = local_docs.find(doc_id);
+					if (it != local_docs.end())
+						continue;
+
+					std::string file = m_input + lexical_cast(doc_id) + ".html";
+					try {
+						parser.feed(file.c_str(), 4);
+
+						if (parser.hashes().size() == 0) {
+							le.valid = false;
+						} else {
+							local_docs.emplace(doc_id,
+								std::move(document(file.c_str(), parser.hashes())));
+						}
+
+					} catch (const std::exception &e) {
+						//std::cerr << file << ": caught exception: " << e.what() << std::endl;
+						le.valid = false;
+						break;
+					}
+				}
+			}
+
+			std::unique_lock<std::mutex> guard(m_lock);
+			for (auto doc : local_docs) {
+				m_docs.emplace(doc.first, std::move(doc.second));
+			}
+		}
+
+		void add_documents(int cpunum) {
+			std::vector<std::thread> threads;
+
+			for (int i = 0; i < cpunum; ++i) {
+				struct doc_thread dth;
+
+				dth.id = i;
+				dth.step = cpunum;
+
+				threads.emplace_back(std::bind(&learner::load_documents, this, dth));
+			}
+
+			for (int i = 0; i < cpunum; ++i) {
+				threads[i].join();
+			}
+
+			printf("documents added: %zd\n", m_docs.size());
+		}
+};
+
 int main(int argc, char *argv[])
 {
-	document_parser p;
+	namespace bpo = boost::program_options;
+
+	bpo::options_description generic("Similarity options");
+
+	std::string mode, input, learn_file;
+	generic.add_options()
+		("help", "This help message")
+		("input", bpo::value<std::string>(&input), "Input directory")
+		("learn", bpo::value<std::string>(&learn_file), "Learning data file")
+		("mode", bpo::value<std::string>(&mode)->default_value("learn"), "Processing mode: learn/check")
+		;
+
+	bpo::variables_map vm;
+
+	try {
+		bpo::store(bpo::parse_command_line(argc, argv, generic), vm);
+		bpo::notify(vm);
+	} catch (const std::exception &e) {
+		std::cerr << "Invalid options: " << e.what() << "\n" << generic << std::endl;
+		return -1;
+	}
+
+	if (!vm.count("input")) {
+		std::cerr << "No input directory\n" << generic << std::endl;
+		return -1;
+	}
+
+	if ((mode == "learn") && !vm.count("learn")) {
+		std::cerr << "Learning mode requires file with learning data\n" << generic << std::endl;
+		return -1;
+	}
+
+	xmlInitParser();
+
+	if (mode == "learn") {
+		learner l(input, learn_file);
+		return -1;
+	}
+#if 0
 	std::vector<document> docs;
 
-	for (int i = 1; i < argc; ++i) {
+	for (auto f : files) {
 		try {
 			p.feed(argv[i], 4);
 			if (p.hashes().size() > 0)
@@ -254,41 +423,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	std::vector<std::thread> threads;
 
-	struct doc_thread {
-		const std::vector<document> &docs;
-		int id;
-		int step;
-
-		doc_thread(const std::vector<document> &d) : docs(d), id(0), step(0) {}
-
-		void operator()(void) {
-			for (size_t i = id; i < docs.size(); i += step) {
-				const document &doc = docs[i];
-
-				for (size_t j = i + 1; j < docs.size(); ++j) {
-					const document &tmp = docs[j];
-
-					if (tmp == doc) {
-						printf("%d/%d: equal: %s vs %s\n",
-							id, step, doc.name().c_str(), tmp.name().c_str());
-					}
-				}
-			}
-		}
-	};
-
-	int step = 16;
-	for (int i = 0; i < step; ++i) {
-		struct doc_thread dth(docs);
-		dth.id = i;
-		dth.step = step;
-
-		threads.emplace_back(dth);
-	}
-
-	for (int i = 0; i < step; ++i) {
-		threads[i].join();
-	}
+#endif
 }
