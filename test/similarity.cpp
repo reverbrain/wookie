@@ -101,8 +101,8 @@ class document_parser {
 			return m_tokens;
 		}
 
-		const std::vector<long> &hashes(void) const {
-			return m_hashes;
+		void swap(std::vector<long> &hashes) {
+			m_hashes.swap(hashes);
 		}
 
 	private:
@@ -194,13 +194,8 @@ class document {
 			m_hashes.assign(hashes.begin(), hashes.begin() + num);
 		}
 
-		document(const document &doc) {
-			m_hashes = doc.m_hashes;
-			m_path = doc.m_path;
-		}
-
-		document(const document &&doc) {
-			m_hashes = doc.m_hashes;
+		document(document &&doc) {
+			m_hashes.swap(doc.m_hashes);
 			m_path = doc.m_path;
 		}
 
@@ -219,6 +214,8 @@ class document {
 	private:
 		std::string m_path;
 		std::vector<long> m_hashes;
+
+		document(const document &doc) = delete;
 
 		bool equality(const document &doc) const {
 			size_t matched = 0;
@@ -317,13 +314,15 @@ class learner {
 
 					std::string file = m_input + lexical_cast(doc_id) + ".html";
 					try {
+						std::vector<long> hashes_4;
 						parser.feed(file.c_str(), 4);
+						parser.swap(hashes_4);
 
-						if (parser.hashes().size() == 0) {
+						if (hashes_4.size() == 0) {
 							le.valid = false;
 						} else {
 							local_docs.emplace(doc_id,
-								std::move(document(file.c_str(), parser.hashes())));
+								std::move(document(file.c_str(), hashes_4)));
 						}
 
 					} catch (const std::exception &e) {
@@ -335,7 +334,7 @@ class learner {
 			}
 
 			std::unique_lock<std::mutex> guard(m_lock);
-			for (auto doc : local_docs) {
+			for (auto & doc : local_docs) {
 				m_docs.emplace(doc.first, std::move(doc.second));
 			}
 		}
