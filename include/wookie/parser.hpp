@@ -33,16 +33,18 @@ namespace ioremap { namespace wookie {
 
 class parser {
 	public:
-		parser() {}
+		parser() {
+			m_ctx = htmlNewParserCtxt();
+			if (!m_ctx)
+				throw std::runtime_error("could not allocate new parser context");
+		}
+
+		~parser() {
+			htmlFreeParserCtxt(m_ctx);
+		}
 
 		void parse(const std::string &page, const std::string &encoding) {
 			reset();
-
-			htmlParserCtxtPtr ctx;
-
-			ctx = htmlNewParserCtxt();
-			if (!ctx)
-				throw std::runtime_error("could not allocate new parser context");
 
 			int options = HTML_PARSE_RECOVER | HTML_PARSE_NOBLANKS |
 				HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING |
@@ -50,17 +52,15 @@ class parser {
 			if (encoding.size())
 				options |= HTML_PARSE_IGNORE_ENC;
 
-			htmlDocPtr doc = htmlCtxtReadMemory(ctx, page.c_str(), page.size(), "url", encoding.c_str(), options);
+			htmlDocPtr doc = htmlCtxtReadMemory(m_ctx, page.c_str(), page.size(),
+					"url", encoding.c_str(), options);
 
-			if (doc == NULL) {
-				htmlFreeParserCtxt(ctx);
+			if (doc == NULL)
 				throw std::runtime_error("could not parse page");
-			}
 
 			htmlNodePtr root = xmlDocGetRootElement(doc);
 			traverse_tree(root);
 
-			htmlFreeParserCtxt(ctx);
 			xmlFreeDoc(doc);
 		}
 
@@ -82,6 +82,8 @@ class parser {
 	private:
 		std::vector<std::string> m_urls;
 		std::vector<std::string> m_tokens;
+		htmlParserCtxtPtr m_ctx;
+
 
 		void reset(void) {
 			m_urls.clear();
