@@ -46,6 +46,9 @@ class parser {
 		void parse(const std::string &page, const std::string &encoding) {
 			reset();
 
+			if (page.size() == 0)
+				return;
+
 			int options = HTML_PARSE_RECOVER | HTML_PARSE_NOBLANKS |
 				HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING |
 				HTML_PARSE_NONET | HTML_PARSE_COMPACT;
@@ -54,7 +57,6 @@ class parser {
 
 			htmlDocPtr doc = htmlCtxtReadMemory(m_ctx, page.c_str(), page.size(),
 					"url", encoding.c_str(), options);
-
 			if (doc == NULL)
 				throw std::runtime_error("could not parse page");
 
@@ -92,6 +94,10 @@ class parser {
 
 		void traverse_tree(htmlNodePtr start) {
 			for (htmlNodePtr node = start; node; node = node->next) {
+#ifdef STDOUT_DEBUG
+				printf("%d: type: %d, name: %s, content: %s\n",
+					node->line, node->type, (char *)node->name, (char *)node->content);
+#endif
 				if (node->type == XML_TEXT_NODE) {
 					m_tokens.push_back((char *)node->content);
 				}
@@ -100,9 +106,12 @@ class parser {
 					if (!xmlStrcmp(node->name, (xmlChar *)"a")) {
 						xmlChar *data = xmlGetProp(node, (xmlChar *)"href");
 						if (data) {
+#ifdef STDOUT_DEBUG
+							printf("%d: link: %s\n",
+								node->line, (char *)data);
+#endif
 							m_urls.push_back((char *)data);
 							xmlFree(data);
-							break;
 						}
 					}
 				}
