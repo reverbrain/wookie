@@ -82,6 +82,9 @@ class document_parser {
 
 		void feed(const char *path, size_t ngram_num) {
 			std::ifstream in(path);
+			if (in.bad())
+				return;
+
 			std::ostringstream ss;
 
 			ss << in.rdbuf();
@@ -93,12 +96,8 @@ class document_parser {
 			generate_tokens(ngram_num);
 		}
 
-		std::string text(const char *delim) const {
-			return m_parser.text(delim);
-		}
-
-		const std::vector<std::string> &tokens(void) const {
-			return m_tokens;
+		std::string text(void) const {
+			return m_parser.text(" ");
 		}
 
 		void swap(std::vector<long> &hashes) {
@@ -285,6 +284,7 @@ class learner {
 				}
 			}
 
+			printf("pairs loaded: %zd\n", m_elements.size());
 			add_documents(8);
 		}
 
@@ -314,19 +314,23 @@ class learner {
 
 					std::string file = m_input + lexical_cast(doc_id) + ".html";
 					try {
-						std::vector<long> hashes_4;
-						parser.feed(file.c_str(), 4);
-						parser.swap(hashes_4);
+						int ngram = 4;
 
-						if (hashes_4.size() == 0) {
+						std::vector<long> hashes;
+						parser.feed(file.c_str(), ngram);
+						parser.swap(hashes);
+
+						if (hashes.size() == 0) {
+							fprintf(stderr, "%s: invalid file, no %d-grams found: %s\n",
+									file.c_str(), ngram, parser.text().c_str());
 							le.valid = false;
 						} else {
 							local_docs.emplace(doc_id,
-								std::move(document(file.c_str(), hashes_4)));
+								std::move(document(file.c_str(), hashes)));
 						}
 
 					} catch (const std::exception &e) {
-						//std::cerr << file << ": caught exception: " << e.what() << std::endl;
+						std::cerr << file << ": caught exception: " << e.what() << std::endl;
 						le.valid = false;
 						break;
 					}
