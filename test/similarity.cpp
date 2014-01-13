@@ -321,8 +321,8 @@ class learner {
 						parser.swap(hashes);
 
 						if (hashes.size() == 0) {
-							fprintf(stderr, "%s: invalid file, no %d-grams found: %s\n",
-									file.c_str(), ngram, parser.text().c_str());
+							fprintf(stderr, "%s: invalid file, no %d-grams found, text size: %zd\n",
+									file.c_str(), ngram, parser.text().size());
 							le.valid = false;
 						} else {
 							local_docs.emplace(doc_id,
