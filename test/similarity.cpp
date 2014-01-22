@@ -173,6 +173,8 @@ struct ngram {
 		hashes.swap(h);
 	}
 
+	ngram(void) {}
+
 	std::vector<long> hashes;
 };
 
@@ -274,23 +276,25 @@ class learner {
 		};
 
 		void generate_ngrams(document_parser &parser, const std::string &text, std::vector<ngram> &ngrams) {
-			for (int i = 2; i <= 6; ++i) {
+			for (int i = 1; i <= 4; ++i) {
 				std::vector<long> hashes;
 
 				parser.generate(text, i, hashes);
+
 				ngrams.emplace_back(hashes);
 			}
 		}
 
 		void load_documents(struct doc_thread &dth) {
 			document_parser parser;
-			std::map<int, document> local_docs;
 
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
 
 				std::vector<ngram> req_ngrams; 
 				generate_ngrams(parser, le.request, req_ngrams);
+
+				std::map<int, document> local_docs;
 
 				for (auto doc_id : le.docs) {
 					auto it = local_docs.find(doc_id);
@@ -312,7 +316,61 @@ class learner {
 						break;
 					}
 				}
+
+				generate_features(le, req_ngrams, local_docs);
 			}
+		}
+
+		ngram intersect(const ngram &f, const ngram &s) {
+			ngram tmp;
+			tmp.hashes.resize(f.hashes.size());
+
+			auto inter = std::set_intersection(f.hashes.begin(), f.hashes.end(),
+					s.hashes.begin(), s.hashes.end(), tmp.hashes.begin());
+			tmp.hashes.resize(inter - tmp.hashes.begin());
+
+			return tmp;
+		}
+
+		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams, std::map<int, document> &docs) {
+			std::vector<ngram> matched;
+
+			for (size_t i = 0; i < docs.begin()->second.ngrams().size(); ++i) {
+				ngram out;
+
+				for (auto it = docs.begin(); it != docs.end(); ++it) {
+					if ((i == 0) && (it->second.ngrams()[0].hashes.size() == 0)) {
+						le.valid = false;
+						return;
+					}
+
+					if (it == docs.begin()) {
+						out = it->second.ngrams()[i];
+					} else {
+						ngram &s = it->second.ngrams()[i];
+						out = intersect(out, s);
+					}
+				}
+
+				matched.emplace_back(out);
+			}
+
+			std::vector<ngram> matched_req;
+			for (size_t i = 0; i < req_ngrams.size(); ++i) {
+				ngram out;
+
+				const ngram &f = req_ngrams[i];
+				const ngram &s = matched[i];
+
+				out = intersect(f, s);
+
+				printf("%zd/%zd: '%s': intersected ngrams: %zd\n", i, req_ngrams.size(),
+						le.request.c_str(),
+						out.hashes.size());
+
+				matched_req.emplace_back(out);
+			}
+
 		}
 
 		void add_documents(int cpunum) {
