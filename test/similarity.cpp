@@ -80,7 +80,7 @@ class document_parser {
 		document_parser() : m_loc(m_gen("en_UR.UTF8")) {
 		}
 
-		void feed(const char *path, size_t ngram_num) {
+		void feed(const char *path) {
 			std::ifstream in(path);
 			if (in.bad())
 				return;
@@ -89,32 +89,14 @@ class document_parser {
 
 			ss << in.rdbuf();
 
-			m_tokens.clear();
-			m_hashes.clear();
-
 			m_parser.parse(ss.str(), "utf8");
-			generate_tokens(ngram_num);
 		}
 
 		std::string text(void) const {
 			return m_parser.text(" ");
 		}
 
-		void swap(std::vector<long> &hashes) {
-			m_hashes.swap(hashes);
-		}
-
-	private:
-		wookie::parser m_parser;
-		boost::locale::generator m_gen;
-		std::locale m_loc;
-
-		std::vector<std::string> m_tokens;
-		std::vector<long> m_hashes;
-
-		void generate_tokens(size_t ngram_num) {
-			std::string text = m_parser.text(" ");
-
+		void generate(const std::string &text, int ngram_num, std::vector<long> &hashes) {
 			namespace lb = boost::locale::boundary;
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
 			wmap.rule(lb::word_any);
@@ -125,21 +107,24 @@ class document_parser {
 				std::string token = boost::locale::to_lower(it->str(), m_loc);
 
 				ngram.push_back(token);
-				m_tokens.emplace_back(token);
 
-				if (ngram.size() == ngram_num) {
+				if ((int)ngram.size() == ngram_num) {
 					std::ostringstream ss;
 					std::copy(ngram.begin(), ngram.end(), std::ostream_iterator<std::string>(ss, ""));
 
-					m_hashes.emplace_back(hash(ss.str(), 0));
+					hashes.emplace_back(hash(ss.str(), 0));
 					ngram.pop_front();
 				}
 			}
 
-			std::set<long> tmp(m_hashes.begin(), m_hashes.end());
-			m_hashes.assign(tmp.begin(), tmp.end());
+			std::set<long> tmp(hashes.begin(), hashes.end());
+			hashes.assign(tmp.begin(), tmp.end());
 		}
 
+	private:
+		wookie::parser m_parser;
+		boost::locale::generator m_gen;
+		std::locale m_loc;
 
 		// murmur hash
 		long hash(const std::string &str, long seed) const {
@@ -183,67 +168,58 @@ class document_parser {
 		}
 };
 
+struct ngram {
+	ngram(std::vector<long> &h) {
+		hashes.swap(h);
+	}
+
+	std::vector<long> hashes;
+};
+
 class document {
 	public:
-		document(const char *path, const std::vector<long> &hashes, size_t num = 0) : m_path(path) {
-			if (num > hashes.size() || !num)
-				num = hashes.size();
-
-			m_hashes.reserve(num);
-			m_hashes.assign(hashes.begin(), hashes.begin() + num);
-		}
-
-		document(document &&doc) {
-			m_hashes.swap(doc.m_hashes);
-			m_path = doc.m_path;
+		document(const char *path) : m_path(path) {
 		}
 
 		const std::string &name(void) const {
 			return m_path;
 		}
 
-		const std::vector<long> &hashes(void) const {
-			return m_hashes;
-		}
-
-		bool operator==(const document &doc) const {
-			return equality(doc);
+		std::vector<ngram> &ngrams(void) {
+			return m_ngrams;
 		}
 
 	private:
 		std::string m_path;
-		std::vector<long> m_hashes;
+		std::vector<ngram> m_ngrams;
+};
 
-		document(const document &doc) = delete;
+enum feature_bits {
+	ngram2_match = 0,
+	ngram3_match,
+	ngram4_match,
+	ngram5_match,
+	ngram6_match,
 
-		bool equality(const document &doc) const {
-			size_t matched = 0;
-			for (const auto h : doc.hashes()) {
-				if (std::binary_search(m_hashes.begin(), m_hashes.end(), h)) {
-					matched++;
-				}
-			}
+	ngram2_req_match,
+	ngram3_req_match,
+	ngram4_req_match,
+	ngram5_req_match,
+	ngram6_req_match,
 
-			if (matched >= doc.hashes().size() * 1 / 10 + 1) {
-#if 1
-				printf("equal: %s [%zd] vs %s [%zd]: %zd\n",
-					name().c_str(), hashes().size(),
-					doc.name().c_str(), doc.hashes().size(),
-					matched);
-#endif
-				return true;
-			}
-
-			return false;
-		}
+	feature_num
 };
 
 struct learn_element {
-	learn_element() : valid(true) {}
+	learn_element() : valid(true) {
+		memset(features, 0, sizeof(features));
+	}
 
 	std::vector<int> docs;
 	std::string request;
 	bool valid;
+
+	int features[feature_num];
 };
 
 class learner {
@@ -292,13 +268,19 @@ class learner {
 		std::string m_input;
 		std::vector<learn_element> m_elements;
 
-		std::mutex m_lock;
-		std::map<int, document> m_docs;
-
 		struct doc_thread {
 			int id;
 			int step;
 		};
+
+		void generate_ngrams(document_parser &parser, const std::string &text, std::vector<ngram> &ngrams) {
+			for (int i = 2; i <= 6; ++i) {
+				std::vector<long> hashes;
+
+				parser.generate(text, i, hashes);
+				ngrams.emplace_back(hashes);
+			}
+		}
 
 		void load_documents(struct doc_thread &dth) {
 			document_parser parser;
@@ -307,6 +289,9 @@ class learner {
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
 
+				std::vector<ngram> req_ngrams; 
+				generate_ngrams(parser, le.request, req_ngrams);
+
 				for (auto doc_id : le.docs) {
 					auto it = local_docs.find(doc_id);
 					if (it != local_docs.end())
@@ -314,32 +299,19 @@ class learner {
 
 					std::string file = m_input + lexical_cast(doc_id) + ".html";
 					try {
-						int ngram = 4;
+						parser.feed(file.c_str());
+						std::string text = parser.text();
 
-						std::vector<long> hashes;
-						parser.feed(file.c_str(), ngram);
-						parser.swap(hashes);
+						document doc(file.c_str());
+						generate_ngrams(parser, text, doc.ngrams());
 
-						if (hashes.size() == 0) {
-							fprintf(stderr, "%s: invalid file, no %d-grams found, text size: %zd\n",
-									file.c_str(), ngram, parser.text().size());
-							le.valid = false;
-						} else {
-							local_docs.emplace(doc_id,
-								std::move(document(file.c_str(), hashes)));
-						}
-
+						local_docs.emplace(doc_id, doc);
 					} catch (const std::exception &e) {
 						std::cerr << file << ": caught exception: " << e.what() << std::endl;
 						le.valid = false;
 						break;
 					}
 				}
-			}
-
-			std::unique_lock<std::mutex> guard(m_lock);
-			for (auto & doc : local_docs) {
-				m_docs.emplace(doc.first, std::move(doc.second));
 			}
 		}
 
@@ -358,8 +330,6 @@ class learner {
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
 			}
-
-			printf("documents added: %zd\n", m_docs.size());
 		}
 };
 
