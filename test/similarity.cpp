@@ -196,32 +196,18 @@ class document {
 		std::vector<ngram> m_ngrams;
 };
 
-enum feature_bits {
-	ngram2_match = 0,
-	ngram3_match,
-	ngram4_match,
-	ngram5_match,
-	ngram6_match,
-
-	ngram2_req_match,
-	ngram3_req_match,
-	ngram4_req_match,
-	ngram5_req_match,
-	ngram6_req_match,
-
-	feature_num
-};
+#define NGRAM_START	1
+#define NGRAM_NUM	4
 
 struct learn_element {
 	learn_element() : valid(true) {
-		memset(features, 0, sizeof(features));
 	}
 
 	std::vector<int> docs;
 	std::string request;
 	bool valid;
 
-	int features[feature_num];
+	std::vector<int> features;
 };
 
 class learner {
@@ -276,7 +262,7 @@ class learner {
 		};
 
 		void generate_ngrams(document_parser &parser, const std::string &text, std::vector<ngram> &ngrams) {
-			for (int i = 1; i <= 4; ++i) {
+			for (int i = NGRAM_START; i <= NGRAM_START + NGRAM_NUM; ++i) {
 				std::vector<long> hashes;
 
 				parser.generate(text, i, hashes);
@@ -333,8 +319,6 @@ class learner {
 		}
 
 		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams, std::map<int, document> &docs) {
-			std::vector<ngram> matched;
-
 			for (size_t i = 0; i < docs.begin()->second.ngrams().size(); ++i) {
 				ngram out;
 
@@ -352,25 +336,16 @@ class learner {
 					}
 				}
 
-				matched.emplace_back(out);
+				le.features.push_back(out.hashes.size());
+
+				ngram req_out;
+
+				req_out = intersect(req_ngrams[i], out);
+
+				le.features.push_back(req_out.hashes.size());
 			}
 
-			std::vector<ngram> matched_req;
-			for (size_t i = 0; i < req_ngrams.size(); ++i) {
-				ngram out;
-
-				const ngram &f = req_ngrams[i];
-				const ngram &s = matched[i];
-
-				out = intersect(f, s);
-
-				printf("%zd/%zd: '%s': intersected ngrams: %zd\n", i, req_ngrams.size(),
-						le.request.c_str(),
-						out.hashes.size());
-
-				matched_req.emplace_back(out);
-			}
-
+			le.features.push_back(req_ngrams[0].hashes.size());
 		}
 
 		void add_documents(int cpunum) {
