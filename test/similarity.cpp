@@ -180,7 +180,7 @@ struct ngram {
 
 class document {
 	public:
-		document(const char *path) : m_path(path) {
+		document(int doc_id, const char *path) : m_doc_id(doc_id), m_path(path) {
 		}
 
 		const std::string &name(void) const {
@@ -191,7 +191,16 @@ class document {
 			return m_ngrams;
 		}
 
+		const std::vector<ngram> &ngrams(void) const {
+			return m_ngrams;
+		}
+
+		int id(void) const {
+			return m_doc_id;
+		}
+
 	private:
+		int m_doc_id;
 		std::string m_path;
 		std::vector<ngram> m_ngrams;
 };
@@ -203,7 +212,8 @@ struct learn_element {
 	learn_element() : valid(true) {
 	}
 
-	std::vector<int> docs;
+	std::vector<int> doc_ids;
+	std::vector<document> docs;
 	std::string request;
 	bool valid;
 
@@ -241,7 +251,7 @@ class learner {
 				if (pos && *pos) {
 					learn_element le;
 
-					le.docs = std::vector<int>(doc, doc+2);
+					le.doc_ids = std::vector<int>(doc, doc+2);
 					le.request.assign(pos);
 
 					m_elements.emplace_back(std::move(le));
@@ -280,22 +290,16 @@ class learner {
 				std::vector<ngram> req_ngrams; 
 				generate_ngrams(parser, le.request, req_ngrams);
 
-				std::map<int, document> local_docs;
-
-				for (auto doc_id : le.docs) {
-					auto it = local_docs.find(doc_id);
-					if (it != local_docs.end())
-						continue;
-
+				for (auto doc_id : le.doc_ids) {
 					std::string file = m_input + lexical_cast(doc_id) + ".html";
 					try {
 						parser.feed(file.c_str());
 						std::string text = parser.text();
 
-						document doc(file.c_str());
+						document doc(doc_id, file.c_str());
 						generate_ngrams(parser, text, doc.ngrams());
 
-						local_docs.emplace(doc_id, doc);
+						le.docs.emplace_back(doc);
 					} catch (const std::exception &e) {
 						std::cerr << file << ": caught exception: " << e.what() << std::endl;
 						le.valid = false;
@@ -303,7 +307,7 @@ class learner {
 					}
 				}
 
-				generate_features(le, req_ngrams, local_docs);
+				generate_features(le, req_ngrams);
 			}
 		}
 
@@ -318,31 +322,19 @@ class learner {
 			return tmp;
 		}
 
-		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams, std::map<int, document> &docs) {
-			for (size_t i = 0; i < docs.begin()->second.ngrams().size(); ++i) {
-				ngram out;
+		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams) {
+			const std::vector<ngram> &f = le.docs[0].ngrams();
+			const std::vector<ngram> &s = le.docs[1].ngrams();
 
-				for (auto it = docs.begin(); it != docs.end(); ++it) {
-					if ((i == 0) && (it->second.ngrams()[0].hashes.size() == 0)) {
-						le.valid = false;
-						return;
-					}
+			std::ostringstream ss;
 
-					if (it == docs.begin()) {
-						out = it->second.ngrams()[i];
-					} else {
-						ngram &s = it->second.ngrams()[i];
-						out = intersect(out, s);
-					}
-				}
-
+			for (size_t i = 0; i < req_ngrams.size(); ++i) {
+				ngram out = intersect(f[i], s[i]);
 				le.features.push_back(out.hashes.size());
 
-				ngram req_out;
-
-				req_out = intersect(req_ngrams[i], out);
-
+				ngram req_out = intersect(req_ngrams[i], out);
 				le.features.push_back(req_out.hashes.size());
+
 			}
 
 			le.features.push_back(req_ngrams[0].hashes.size());
