@@ -15,6 +15,11 @@
 #include <boost/locale.hpp>
 #include <boost/program_options.hpp>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#include <dlib/svm.h>
+#pragma GCC diagnostic pop
+
 using namespace ioremap;
 
 class charset_convert {
@@ -209,7 +214,7 @@ class document {
 #define NGRAM_NUM	4
 
 struct learn_element {
-	learn_element() : valid(true) {
+	learn_element() : valid(false) {
 	}
 
 	std::vector<int> doc_ids;
@@ -220,9 +225,44 @@ struct learn_element {
 	std::vector<int> features;
 };
 
+class dlib_learner {
+	public:
+		dlib_learner() {}
+
+		void add_sample(const learn_element &le, int label) {
+			if (!le.valid)
+				return;
+
+			sample_type s;
+			s.set_size(le.features.size());
+
+			std::ostringstream ss;
+			ss << le.request << ": ";
+			for (size_t i = 0; i < le.features.size(); ++i) {
+				s(i) = le.features[i];
+				ss << le.features[i] << " ";
+			}
+
+			ss << ": " << label << std::endl;
+			std::cout << ss.str();
+
+			m_samples.push_back(s);
+			m_labels.push_back(label);
+		}
+
+	private:
+		typedef dlib::matrix<double, 0, 1> sample_type;
+		typedef dlib::radial_basis_kernel<sample_type> kernel_type;
+
+		std::vector<sample_type> m_samples;
+		std::vector<double> m_labels;
+};
+
 class learner {
 	public:
 		learner(const std::string &input, const std::string &learn_file) : m_input(input) {
+			srand(time(NULL));
+
 			std::ifstream in(learn_file.c_str());
 
 			std::string line;
@@ -259,12 +299,22 @@ class learner {
 			}
 
 			printf("pairs loaded: %zd\n", m_elements.size());
+			m_negative_elements.resize(m_elements.size());
+
 			add_documents(8);
+
+			dlib_learner dl;
+
+			for (size_t i = 0; i < m_elements.size(); ++i) {
+				dl.add_sample(m_elements[i], +1);
+				dl.add_sample(m_negative_elements[i], -1);
+			}
 		}
 
 	private:
 		std::string m_input;
 		std::vector<learn_element> m_elements;
+		std::vector<learn_element> m_negative_elements;
 
 		struct doc_thread {
 			int id;
@@ -302,12 +352,12 @@ class learner {
 						le.docs.emplace_back(doc);
 					} catch (const std::exception &e) {
 						std::cerr << file << ": caught exception: " << e.what() << std::endl;
-						le.valid = false;
 						break;
 					}
 				}
 
 				generate_features(le, req_ngrams);
+				generate_negative_element(le, i, m_negative_elements[i], req_ngrams);
 			}
 		}
 
@@ -338,6 +388,7 @@ class learner {
 			}
 
 			le.features.push_back(req_ngrams[0].hashes.size());
+			le.valid = true;
 		}
 
 		void add_documents(int cpunum) {
@@ -355,6 +406,44 @@ class learner {
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
 			}
+		}
+
+		void generate_negative_element(learn_element &le, int position,
+				learn_element &negative, const std::vector<ngram> &req_ngrams) {
+
+			if (!le.valid)
+				return;
+
+			int doc_id = le.doc_ids[0];
+
+			negative.doc_ids.push_back(doc_id);
+			negative.docs.push_back(le.docs[0]);
+
+			negative.request = le.request;
+
+			if (!position)
+				position = 1;
+
+			int total = 0;
+			int total_max = 10;
+			while (++total < total_max) {
+				int pos = rand() % position;
+				le = m_elements[pos];
+
+				if (!le.valid)
+					continue;
+
+				if ((doc_id != le.doc_ids[0]) && (doc_id != le.doc_ids[1])) {
+					negative.doc_ids.push_back(le.doc_ids[0]);
+					negative.docs.push_back(le.docs[0]);
+					break;
+				}
+			}
+
+			if (total >= total_max)
+				return;
+
+			generate_features(negative, req_ngrams);
 		}
 };
 
