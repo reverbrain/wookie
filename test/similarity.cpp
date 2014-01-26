@@ -1,5 +1,6 @@
 #include "wookie/parser.hpp"
 #include "wookie/lexical_cast.hpp"
+#include "wookie/timer.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -185,11 +186,7 @@ struct ngram {
 
 class document {
 	public:
-		document(int doc_id, const char *path) : m_doc_id(doc_id), m_path(path) {
-		}
-
-		const std::string &name(void) const {
-			return m_path;
+		document(int doc_id) : m_doc_id(doc_id) {
 		}
 
 		std::vector<ngram> &ngrams(void) {
@@ -206,7 +203,6 @@ class document {
 
 	private:
 		int m_doc_id;
-		std::string m_path;
 		std::vector<ngram> m_ngrams;
 };
 
@@ -218,7 +214,6 @@ struct learn_element {
 	}
 
 	std::vector<int> doc_ids;
-	std::vector<document> docs;
 	std::string request;
 	bool valid;
 
@@ -237,17 +232,25 @@ class dlib_learner {
 			s.set_size(le.features.size());
 
 			std::ostringstream ss;
-			ss << le.request << ": ";
+			ss << le.request << ": " << le.doc_ids[0] << "," << le.doc_ids[1] << ": ";
 			for (size_t i = 0; i < le.features.size(); ++i) {
 				s(i) = le.features[i];
 				ss << le.features[i] << " ";
 			}
 
 			ss << ": " << label << std::endl;
-			std::cout << ss.str();
+			//std::cout << ss.str();
 
 			m_samples.push_back(s);
 			m_labels.push_back(label);
+		}
+
+		void normalize(void) {
+			dlib::vector_normalizer<sample_type> normalizer;
+
+			normalizer.train(m_samples);
+			for (size_t i = 0; i < m_samples.size(); ++i)
+				m_samples[i] = normalizer(m_samples[i]);
 		}
 
 	private:
@@ -265,6 +268,7 @@ class learner {
 
 			std::ifstream in(learn_file.c_str());
 
+			std::set<int> ids;
 			std::string line;
 			int line_num = 0;
 			while (std::getline(in, line)) {
@@ -294,8 +298,18 @@ class learner {
 					le.doc_ids = std::vector<int>(doc, doc+2);
 					le.request.assign(pos);
 
+					ids.insert(doc[0]);
+					ids.insert(doc[1]);
+
 					m_elements.emplace_back(std::move(le));
 				}
+			}
+
+			m_documents.reserve(ids.size());
+			for (auto id : ids) {
+				m_documents.emplace_back(document(id));
+
+				m_id_position[id] = m_documents.size() - 1;
 			}
 
 			printf("pairs loaded: %zd\n", m_elements.size());
@@ -309,10 +323,16 @@ class learner {
 				dl.add_sample(m_elements[i], +1);
 				dl.add_sample(m_negative_elements[i], -1);
 			}
+
+			dl.normalize();
 		}
 
 	private:
 		std::string m_input;
+		std::vector<document> m_documents;
+
+		std::map<int, int> m_id_position;
+
 		std::vector<learn_element> m_elements;
 		std::vector<learn_element> m_negative_elements;
 
@@ -334,30 +354,32 @@ class learner {
 		void load_documents(struct doc_thread &dth) {
 			document_parser parser;
 
+			for (size_t i = dth.id; i < m_documents.size(); i += dth.step) {
+				document & doc = m_documents[i];
+
+				std::string file = m_input + lexical_cast(doc.id()) + ".html";
+				try {
+					parser.feed(file.c_str());
+					std::string text = parser.text();
+
+					generate_ngrams(parser, text, doc.ngrams());
+				} catch (const std::exception &e) {
+					std::cerr << file << ": caught exception: " << e.what() << std::endl;
+				}
+			}
+		}
+
+		void load_elements(struct doc_thread &dth) {
+			document_parser parser;
+
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
 
-				std::vector<ngram> req_ngrams; 
+				std::vector<ngram> req_ngrams;
 				generate_ngrams(parser, le.request, req_ngrams);
 
-				for (auto doc_id : le.doc_ids) {
-					std::string file = m_input + lexical_cast(doc_id) + ".html";
-					try {
-						parser.feed(file.c_str());
-						std::string text = parser.text();
-
-						document doc(doc_id, file.c_str());
-						generate_ngrams(parser, text, doc.ngrams());
-
-						le.docs.emplace_back(doc);
-					} catch (const std::exception &e) {
-						std::cerr << file << ": caught exception: " << e.what() << std::endl;
-						break;
-					}
-				}
-
 				generate_features(le, req_ngrams);
-				generate_negative_element(le, i, m_negative_elements[i], req_ngrams);
+				generate_negative_element(le, m_negative_elements[i], req_ngrams);
 			}
 		}
 
@@ -373,10 +395,11 @@ class learner {
 		}
 
 		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams) {
-			const std::vector<ngram> &f = le.docs[0].ngrams();
-			const std::vector<ngram> &s = le.docs[1].ngrams();
+			int pos1 = m_id_position[le.doc_ids[0]];
+			int pos2 = m_id_position[le.doc_ids[1]];
 
-			std::ostringstream ss;
+			const std::vector<ngram> &f = m_documents[pos1].ngrams();
+			const std::vector<ngram> &s = m_documents[pos2].ngrams();
 
 			for (size_t i = 0; i < req_ngrams.size(); ++i) {
 				ngram out = intersect(f[i], s[i]);
@@ -394,6 +417,8 @@ class learner {
 		void add_documents(int cpunum) {
 			std::vector<std::thread> threads;
 
+			wookie::timer tm;
+
 			for (int i = 0; i < cpunum; ++i) {
 				struct doc_thread dth;
 
@@ -406,42 +431,46 @@ class learner {
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
 			}
+
+			threads.clear();
+			long docs_loading_time = tm.restart();
+
+			for (int i = 0; i < cpunum; ++i) {
+				struct doc_thread dth;
+
+				dth.id = i;
+				dth.step = cpunum;
+
+				threads.emplace_back(std::bind(&learner::load_elements, this, dth));
+			}
+
+			for (int i = 0; i < cpunum; ++i) {
+				threads[i].join();
+			}
+
+			long elements_loading_time = tm.restart();
+
+			printf("documents: %zd, load-time: %ld msec, elements: %zd, load-time: %ld msec\n",
+					m_documents.size(), docs_loading_time, m_elements.size(), elements_loading_time);
 		}
 
-		void generate_negative_element(learn_element &le, int position,
-				learn_element &negative, const std::vector<ngram> &req_ngrams) {
-
-			if (!le.valid)
-				return;
-
+		void generate_negative_element(learn_element &le, learn_element &negative, const std::vector<ngram> &req_ngrams) {
 			int doc_id = le.doc_ids[0];
 
 			negative.doc_ids.push_back(doc_id);
-			negative.docs.push_back(le.docs[0]);
 
 			negative.request = le.request;
 
-			if (!position)
-				position = 1;
+			while (1) {
+				int pos = rand() % m_documents.size();
+				const document &next = m_documents[pos];
 
-			int total = 0;
-			int total_max = 10;
-			while (++total < total_max) {
-				int pos = rand() % position;
-				le = m_elements[pos];
-
-				if (!le.valid)
+				if ((pos == doc_id) || !next.ngrams().size() || (pos == le.doc_ids[1]))
 					continue;
 
-				if ((doc_id != le.doc_ids[0]) && (doc_id != le.doc_ids[1])) {
-					negative.doc_ids.push_back(le.doc_ids[0]);
-					negative.docs.push_back(le.docs[0]);
-					break;
-				}
+				negative.doc_ids.push_back(pos);
+				break;
 			}
-
-			if (total >= total_max)
-				return;
 
 			generate_features(negative, req_ngrams);
 		}
