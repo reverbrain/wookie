@@ -83,7 +83,7 @@ class charset_convert {
 
 class document_parser {
 	public:
-		document_parser() : m_loc(m_gen("en_UR.UTF8")) {
+		document_parser() : m_loc(m_gen("en_US.UTF8")) {
 		}
 
 		void feed(const char *path) {
