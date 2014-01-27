@@ -245,12 +245,56 @@ class dlib_learner {
 			m_labels.push_back(label);
 		}
 
-		void normalize(void) {
+		void train_and_test(const std::vector<learn_element> &elements, int num) {
 			dlib::vector_normalizer<sample_type> normalizer;
 
 			normalizer.train(m_samples);
 			for (size_t i = 0; i < m_samples.size(); ++i)
 				m_samples[i] = normalizer(m_samples[i]);
+
+			dlib::krr_trainer<kernel_type> trainer;
+			trainer.use_classification_loss_for_loo_cv();
+
+			double gamma = 0.003125;
+
+			trainer.set_kernel(kernel_type(gamma));
+
+			typedef dlib::decision_function<kernel_type> dec_funct_type;
+			typedef dlib::normalized_function<dec_funct_type> funct_type;
+
+			funct_type learned_function;
+			learned_function.normalizer = normalizer;
+			learned_function.function = trainer.train(m_samples, m_labels);
+
+			std::cout << "\nnumber of basis vectors in our learned_function is " 
+				<< learned_function.function.basis_vectors.size() << std::endl;
+#if 0
+			for (double gamma = 0.000001; gamma <= 1; gamma *= 5) {
+				trainer.set_kernel(kernel_type(gamma));
+
+				std::vector<double> loo_values;
+				trainer.train(m_samples, m_labels, loo_values);
+
+				const double classification_accuracy = dlib::mean_sign_agreement(m_labels, loo_values);
+				std::cout << "gamma: " << gamma << "     LOO accuracy: " << classification_accuracy << std::endl;
+			}
+#endif
+
+			for (int k = 0; k < num; ++k) {
+				const learn_element &le = elements[rand() % elements.size()];
+
+				sample_type s;
+				s.set_size(le.features.size());
+
+				std::ostringstream ss;
+				ss << le.request << ": " << le.doc_ids[0] << "," << le.doc_ids[1] << ": ";
+				for (size_t i = 0; i < le.features.size(); ++i) {
+					s(i) = le.features[i];
+					ss << le.features[i] << " ";
+				}
+
+				std::cout << ss.str() << ": learned: " << learned_function(s) << std::endl;
+			}
 		}
 
 	private:
@@ -324,7 +368,7 @@ class learner {
 				dl.add_sample(m_negative_elements[i], -1);
 			}
 
-			dl.normalize();
+			dl.train_and_test(m_elements, 25);
 		}
 
 	private:
