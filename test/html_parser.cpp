@@ -11,6 +11,7 @@
 
 #include <string.h>
 
+#include <boost/locale.hpp>
 #include <boost/program_options.hpp>
 
 using namespace ioremap;
@@ -23,6 +24,7 @@ int main(int argc, char *argv[])
 
 	generic.add_options()
 		("help", "This help message")
+		("tokenize", "Tokenize text")
 		;
 
 	bpo::positional_options_description p;
@@ -68,7 +70,25 @@ int main(int argc, char *argv[])
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
-			std::cout << parser.text(" ") << std::endl;
+
+			std::string text = parser.text(" ");
+
+			if (vm.count("tokenize")) {
+				boost::locale::generator gen;
+				std::locale loc(gen("en_US.UTF8"));
+
+				namespace lb = boost::locale::boundary;
+				lb::ssegment_index wmap(lb::word, text.begin(), text.end(), loc);
+				wmap.rule(lb::word_any);
+
+				for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+					std::string token = boost::locale::to_lower(it->str(), loc);
+					std::cout << token << " ";
+				}
+				std::cout << std::endl;
+			} else {
+				std::cout << text << std::endl;
+			}
 		} catch (const std::exception &e) {
 			std::cerr << f << ": caught exception: " << e.what() << std::endl;
 		}
