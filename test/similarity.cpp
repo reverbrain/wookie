@@ -207,7 +207,7 @@ class document {
 };
 
 #define NGRAM_START	1
-#define NGRAM_NUM	4
+#define NGRAM_NUM	3
 
 struct learn_element {
 	learn_element() : valid(false) {
@@ -231,15 +231,9 @@ class dlib_learner {
 			sample_type s;
 			s.set_size(le.features.size());
 
-			std::ostringstream ss;
-			ss << le.request << ": " << le.doc_ids[0] << "," << le.doc_ids[1] << ": ";
 			for (size_t i = 0; i < le.features.size(); ++i) {
 				s(i) = le.features[i];
-				ss << le.features[i] << " ";
 			}
-
-			ss << ": " << label << std::endl;
-			//std::cout << ss.str();
 
 			m_samples.push_back(s);
 			m_labels.push_back(label);
@@ -255,9 +249,7 @@ class dlib_learner {
 			dlib::krr_trainer<kernel_type> trainer;
 			trainer.use_classification_loss_for_loo_cv();
 
-			double gamma = 0.003125;
-
-			trainer.set_kernel(kernel_type(gamma));
+			double max_gamma = 0.003125;
 
 			typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
 			typedef dlib::normalized_function<prob_dec_funct_type> pfunct_type;
@@ -270,7 +262,8 @@ class dlib_learner {
 
 			std::cout << "\nnumber of basis vectors in our learned_function is " 
 				<< learned_function.function.decision_funct.basis_vectors.size() << std::endl;
-#if 0
+#if 1
+			double max_accuracy = 0;
 			for (double gamma = 0.000001; gamma <= 1; gamma *= 5) {
 				trainer.set_kernel(kernel_type(gamma));
 
@@ -278,8 +271,13 @@ class dlib_learner {
 				trainer.train(m_samples, m_labels, loo_values);
 
 				const double classification_accuracy = dlib::mean_sign_agreement(m_labels, loo_values);
-				std::cout << "gamma: " << gamma << "     LOO accuracy: " << classification_accuracy << std::endl;
+				std::cout << "gamma: " << gamma << ": LOO accuracy: " << classification_accuracy << std::endl;
+
+				if (classification_accuracy > max_accuracy)
+					max_gamma = gamma;
 			}
+
+			trainer.set_kernel(kernel_type(max_gamma));
 #endif
 
 			std::ofstream out(output.c_str(), std::ios::binary);
