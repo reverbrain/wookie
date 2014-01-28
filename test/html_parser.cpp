@@ -22,9 +22,11 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Document parser options");
 
+	std::string enc;
 	generic.add_options()
 		("help", "This help message")
 		("tokenize", "Tokenize text")
+		("encoding", bpo::value<std::string>(&enc), "Input directory")
 		;
 
 	bpo::positional_options_description p;
@@ -66,7 +68,7 @@ int main(int argc, char *argv[])
 			std::ostringstream ss;
 			ss << in.rdbuf();
 
-			parser.parse(ss.str(), "utf8");
+			parser.parse(ss.str(), enc);
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
