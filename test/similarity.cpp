@@ -95,7 +95,7 @@ class document_parser {
 
 			ss << in.rdbuf();
 
-			m_parser.parse(ss.str(), "utf8");
+			m_parser.parse(ss.str(), "");
 		}
 
 		std::string text(void) const {
@@ -245,7 +245,7 @@ class dlib_learner {
 			m_labels.push_back(label);
 		}
 
-		void train_and_test(const std::vector<learn_element> &elements, int num) {
+		void train_and_test(const std::vector<learn_element> &elements, int num, const std::string &output) {
 			dlib::vector_normalizer<sample_type> normalizer;
 
 			normalizer.train(m_samples);
@@ -259,15 +259,17 @@ class dlib_learner {
 
 			trainer.set_kernel(kernel_type(gamma));
 
-			typedef dlib::decision_function<kernel_type> dec_funct_type;
-			typedef dlib::normalized_function<dec_funct_type> funct_type;
+			typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
+			typedef dlib::normalized_function<prob_dec_funct_type> pfunct_type;
 
-			funct_type learned_function;
+			dlib::randomize_samples(m_samples, m_labels);
+
+			pfunct_type learned_function;
 			learned_function.normalizer = normalizer;
-			learned_function.function = trainer.train(m_samples, m_labels);
+			learned_function.function = dlib::train_probabilistic_decision_function(trainer, m_samples, m_labels, 3);
 
 			std::cout << "\nnumber of basis vectors in our learned_function is " 
-				<< learned_function.function.basis_vectors.size() << std::endl;
+				<< learned_function.function.decision_funct.basis_vectors.size() << std::endl;
 #if 0
 			for (double gamma = 0.000001; gamma <= 1; gamma *= 5) {
 				trainer.set_kernel(kernel_type(gamma));
@@ -280,8 +282,18 @@ class dlib_learner {
 			}
 #endif
 
+			std::ofstream out(output.c_str(), std::ios::binary);
+			dlib::serialize(learned_function, out);
+			out.close();
+
+			long success, total;
+			success = total = 0;
+
 			for (int k = 0; k < num; ++k) {
 				const learn_element &le = elements[rand() % elements.size()];
+
+				if (!le.valid)
+					continue;
 
 				sample_type s;
 				s.set_size(le.features.size());
@@ -293,8 +305,15 @@ class dlib_learner {
 					ss << le.features[i] << " ";
 				}
 
-				std::cout << ss.str() << ": learned: " << learned_function(s) << std::endl;
+				auto l = learned_function(s);
+
+				std::cout << ss.str() << ": learned: " << l << std::endl;
+				if (l > 0.5)
+					success++;
+				total++;
 			}
+
+			printf("success rate: %ld%%\n", success * 100 / total);
 		}
 
 	private:
@@ -307,7 +326,7 @@ class dlib_learner {
 
 class learner {
 	public:
-		learner(const std::string &input, const std::string &learn_file) : m_input(input) {
+		learner(const std::string &input, const std::string &learn_file, const std::string &output) : m_input(input) {
 			srand(time(NULL));
 
 			std::ifstream in(learn_file.c_str());
@@ -368,7 +387,7 @@ class learner {
 				dl.add_sample(m_negative_elements[i], -1);
 			}
 
-			dl.train_and_test(m_elements, 25);
+			dl.train_and_test(m_elements, 125, output);
 		}
 
 	private:
@@ -422,8 +441,8 @@ class learner {
 				std::vector<ngram> req_ngrams;
 				generate_ngrams(parser, le.request, req_ngrams);
 
-				generate_features(le, req_ngrams);
-				generate_negative_element(le, m_negative_elements[i], req_ngrams);
+				if (generate_features(le, req_ngrams))
+					generate_negative_element(le, m_negative_elements[i], req_ngrams);
 			}
 		}
 
@@ -438,12 +457,15 @@ class learner {
 			return tmp;
 		}
 
-		void generate_features(learn_element &le, const std::vector<ngram> &req_ngrams) {
+		bool generate_features(learn_element &le, const std::vector<ngram> &req_ngrams) {
 			int pos1 = m_id_position[le.doc_ids[0]];
 			int pos2 = m_id_position[le.doc_ids[1]];
 
 			const std::vector<ngram> &f = m_documents[pos1].ngrams();
 			const std::vector<ngram> &s = m_documents[pos2].ngrams();
+
+			if (!f.size() || !s.size())
+				return false;
 
 			for (size_t i = 0; i < req_ngrams.size(); ++i) {
 				ngram out = intersect(f[i], s[i]);
@@ -456,6 +478,7 @@ class learner {
 
 			le.features.push_back(req_ngrams[0].hashes.size());
 			le.valid = true;
+			return true;
 		}
 
 		void add_documents(int cpunum) {
@@ -526,11 +549,12 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Similarity options");
 
-	std::string mode, input, learn_file;
+	std::string mode, input, learn_file, learn_output;
 	generic.add_options()
 		("help", "This help message")
 		("input", bpo::value<std::string>(&input), "Input directory")
 		("learn", bpo::value<std::string>(&learn_file), "Learning data file")
+		("learn-output", bpo::value<std::string>(&learn_output), "Learning output file")
 		("mode", bpo::value<std::string>(&mode)->default_value("learn"), "Processing mode: learn/check")
 		;
 
@@ -549,15 +573,15 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if ((mode == "learn") && !vm.count("learn")) {
-		std::cerr << "Learning mode requires file with learning data\n" << generic << std::endl;
+	if ((mode == "learn") && (!vm.count("learn") || !vm.count("learn-output"))) {
+		std::cerr << "Learning mode requires file with learning data and output serialization file\n" << generic << std::endl;
 		return -1;
 	}
 
 	xmlInitParser();
 
 	if (mode == "learn") {
-		learner l(input, learn_file);
+		learner l(input, learn_file, learn_output);
 		return -1;
 	}
 #if 0
