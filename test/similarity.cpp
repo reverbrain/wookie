@@ -239,7 +239,7 @@ class dlib_learner {
 			m_labels.push_back(label);
 		}
 
-		void train_and_test(const std::vector<learn_element> &elements, int num, const std::string &output) {
+		void train_and_test(const std::string &output) {
 			dlib::vector_normalizer<sample_type> normalizer;
 
 			normalizer.train(m_samples);
@@ -249,12 +249,18 @@ class dlib_learner {
 			dlib::krr_trainer<kernel_type> trainer;
 			trainer.use_classification_loss_for_loo_cv();
 
-			double max_gamma = 0.003125;
-
 			typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
 			typedef dlib::normalized_function<prob_dec_funct_type> pfunct_type;
 
 			dlib::randomize_samples(m_samples, m_labels);
+
+			size_t nsize = m_samples.size() / 10;
+
+			std::vector<sample_type> test_samples(std::make_move_iterator(m_samples.begin() + nsize), std::make_move_iterator(m_samples.end()));
+			m_samples.erase(m_samples.begin() + nsize, m_samples.end());
+
+			std::vector<double> test_labels(std::make_move_iterator(m_labels.begin() + nsize), std::make_move_iterator(m_labels.end()));
+			m_labels.erase(m_labels.begin() + nsize, m_labels.end());
 
 			pfunct_type learned_function;
 			learned_function.normalizer = normalizer;
@@ -262,7 +268,9 @@ class dlib_learner {
 
 			std::cout << "\nnumber of basis vectors in our learned_function is " 
 				<< learned_function.function.decision_funct.basis_vectors.size() << std::endl;
-#if 1
+#if 0
+			double max_gamma = 0.003125;
+
 			double max_accuracy = 0;
 			for (double gamma = 0.000001; gamma <= 1; gamma *= 5) {
 				trainer.set_kernel(kernel_type(gamma));
@@ -287,27 +295,13 @@ class dlib_learner {
 			long success, total;
 			success = total = 0;
 
-			for (int k = 0; k < num; ++k) {
-				const learn_element &le = elements[rand() % elements.size()];
-
-				if (!le.valid)
-					continue;
-
-				sample_type s;
-				s.set_size(le.features.size());
-
-				std::ostringstream ss;
-				ss << le.request << ": " << le.doc_ids[0] << "," << le.doc_ids[1] << ": ";
-				for (size_t i = 0; i < le.features.size(); ++i) {
-					s(i) = le.features[i];
-					ss << le.features[i] << " ";
-				}
-
-				auto l = learned_function(s);
-
-				std::cout << ss.str() << ": learned: " << l << std::endl;
-				if (l > 0.5)
+			for (size_t i = 0; i < std::min(test_labels.size(), m_samples.size()); ++i) {
+				auto l = learned_function(test_samples[i]);
+				if ((l >= 0.5) && (test_labels[i] > 0))
 					success++;
+				if ((l < 0.5) && (test_labels[i] < 0))
+					success++;
+
 				total++;
 			}
 
@@ -385,7 +379,7 @@ class learner {
 				dl.add_sample(m_negative_elements[i], -1);
 			}
 
-			dl.train_and_test(m_elements, 125, output);
+			dl.train_and_test(output);
 		}
 
 	private:
