@@ -107,7 +107,7 @@ class document_parser {
 		document_parser() : m_loc(m_gen("en_US.UTF8")) {
 		}
 
-		void feed(const char *path) {
+		void feed(const char *path, const std::string &enc) {
 			std::ifstream in(path);
 			if (in.bad())
 				return;
@@ -116,7 +116,7 @@ class document_parser {
 
 			ss << in.rdbuf();
 
-			m_parser.parse(ss.str(), "");
+			m_parser.parse(ss.str(), enc);
 		}
 
 		std::string text(void) const {

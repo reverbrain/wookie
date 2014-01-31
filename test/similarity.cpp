@@ -198,16 +198,6 @@ class learner {
 			int step;
 		};
 
-		void generate_ngrams(document_parser &parser, const std::string &text, std::vector<ngram> &ngrams) {
-			for (int i = NGRAM_START; i <= NGRAM_START + NGRAM_NUM; ++i) {
-				std::vector<long> hashes;
-
-				parser.generate(text, i, hashes);
-
-				ngrams.emplace_back(hashes);
-			}
-		}
-
 		void load_documents(struct doc_thread &dth) {
 			document_parser parser;
 
@@ -216,10 +206,10 @@ class learner {
 
 				std::string file = m_input + lexical_cast(doc.id()) + ".html";
 				try {
-					parser.feed(file.c_str());
+					parser.feed(file.c_str(), "");
 					std::string text = parser.text();
 
-					generate_ngrams(parser, text, doc.ngrams());
+					parser.generate_ngrams(text, doc.ngrams());
 				} catch (const std::exception &e) {
 					std::cerr << file << ": caught exception: " << e.what() << std::endl;
 				}
