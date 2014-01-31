@@ -123,6 +123,22 @@ class document_parser {
 			return m_parser.text(" ");
 		}
 
+		void generate_ngrams(const std::string &text, std::vector<ngram> &ngrams) {
+			for (int i = NGRAM_START; i <= NGRAM_START + NGRAM_NUM; ++i) {
+				std::vector<long> hashes;
+
+				generate(text, i, hashes);
+
+				ngrams.emplace_back(hashes);
+			}
+		}
+
+
+	private:
+		wookie::parser m_parser;
+		boost::locale::generator m_gen;
+		std::locale m_loc;
+
 		void generate(const std::string &text, int ngram_num, std::vector<long> &hashes) {
 			namespace lb = boost::locale::boundary;
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
@@ -148,21 +164,6 @@ class document_parser {
 			hashes.assign(tmp.begin(), tmp.end());
 		}
 
-		void generate_ngrams(const std::string &text, std::vector<ngram> &ngrams) {
-			for (int i = NGRAM_START; i <= NGRAM_START + NGRAM_NUM; ++i) {
-				std::vector<long> hashes;
-
-				generate(text, i, hashes);
-
-				ngrams.emplace_back(hashes);
-			}
-		}
-
-
-	private:
-		wookie::parser m_parser;
-		boost::locale::generator m_gen;
-		std::locale m_loc;
 
 		// murmur hash
 		long hash(const std::string &str, long seed) const {
