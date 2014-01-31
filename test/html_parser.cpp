@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
 		("help", "This help message")
 		("tokenize", "Tokenize text")
 		("encoding", bpo::value<std::string>(&enc), "Input directory")
+		("ngrams")
 		;
 
 	bpo::positional_options_description p;
@@ -57,23 +58,17 @@ int main(int argc, char *argv[])
 	}
 
 	xmlInitParser();
-	wookie::parser parser;
+	document_parser parser;
+	std::vector<document> documents;
 
 	for (auto f : files) {
 		try {
-			std::ifstream in(f.c_str());
-			if (in.bad())
-				continue;
-
-			std::ostringstream ss;
-			ss << in.rdbuf();
-
-			parser.parse(ss.str(), enc);
+			parser.feed(f.c_str());
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
 
-			std::string text = parser.text(" ");
+			std::string text = parser.text();
 
 			if (vm.count("tokenize")) {
 				boost::locale::generator gen;
@@ -90,6 +85,12 @@ int main(int argc, char *argv[])
 				std::cout << std::endl;
 			} else {
 				std::cout << text << std::endl;
+			}
+
+			if (vm.count("ngrams")) {
+				document doc(0);
+				generate_ngrams(parser, text, doc.ngrams());
+				documents.emplace_back(doc);
 			}
 		} catch (const std::exception &e) {
 			std::cerr << f << ": caught exception: " << e.what() << std::endl;
