@@ -1,3 +1,5 @@
+#include "similarity.hpp"
+
 #include "wookie/parser.hpp"
 #include "wookie/lexical_cast.hpp"
 
@@ -15,6 +17,7 @@
 #include <boost/program_options.hpp>
 
 using namespace ioremap;
+using namespace ioremap::similarity;
 
 int main(int argc, char *argv[])
 {
@@ -27,7 +30,7 @@ int main(int argc, char *argv[])
 		("help", "This help message")
 		("tokenize", "Tokenize text")
 		("encoding", bpo::value<std::string>(&enc), "Input directory")
-		("ngrams")
+		("ngrams", "Generate ngrams and their intersection")
 		;
 
 	bpo::positional_options_description p;
@@ -63,7 +66,7 @@ int main(int argc, char *argv[])
 
 	for (auto f : files) {
 		try {
-			parser.feed(f.c_str());
+			parser.feed(f.c_str(), enc);
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
@@ -89,11 +92,28 @@ int main(int argc, char *argv[])
 
 			if (vm.count("ngrams")) {
 				document doc(0);
-				generate_ngrams(parser, text, doc.ngrams());
+				parser.generate_ngrams(text, doc.ngrams());
 				documents.emplace_back(doc);
 			}
 		} catch (const std::exception &e) {
 			std::cerr << f << ": caught exception: " << e.what() << std::endl;
+		}
+	}
+
+	if (documents.size() >= 2) {
+		for (auto fit = documents.begin(), sit = fit + 1; sit != documents.end(); ++fit, ++sit) {
+			const std::vector<ngram> &f = fit->ngrams();
+			const std::vector<ngram> &s = sit->ngrams();
+
+			if (!f.size() || !s.size())
+				continue;
+
+			printf("ngrams intersect: ");
+			for (size_t i = 0; i < f.size(); ++i) {
+				ngram out = ngram::intersect(f[i], s[i]);
+				printf("%zd ", out.hashes.size());
+			}
+			printf("\n");
 		}
 	}
 }
