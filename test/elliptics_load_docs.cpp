@@ -180,6 +180,7 @@ class loader {
 
 		void update_index(elliptics::session &session, const std::string &doc_id_str) {
 			std::vector<elliptics::data_pointer> tmp;
+			tmp.resize(m_indexes.size());
 			session.set_indexes(doc_id_str, m_indexes, tmp);
 		}
 
