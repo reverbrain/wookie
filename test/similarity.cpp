@@ -11,17 +11,6 @@
 using namespace ioremap;
 using namespace ioremap::similarity;
 
-struct learn_element {
-	learn_element() : valid(false) {
-	}
-
-	std::vector<int> doc_ids;
-	std::string request;
-	bool valid;
-
-	std::vector<int> features;
-};
-
 class dlib_learner {
 	public:
 		dlib_learner() {}

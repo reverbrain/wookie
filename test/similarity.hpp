@@ -17,6 +17,8 @@
 #include <boost/locale.hpp>
 #include <boost/program_options.hpp>
 
+#include <msgpack.hpp>
+
 namespace ioremap { namespace similarity {
 
 class charset_convert {
@@ -78,16 +80,27 @@ class charset_convert {
 };
 
 struct ngram {
-	ngram(std::vector<long> &h) {
+	ngram(int n, std::vector<long> &h) : n(n) {
 		hashes.swap(h);
 	}
 
-	ngram(void) {}
+	ngram() : n(0) {}
+	ngram(int n) : n(n) {}
+	ngram(const ngram &src) {
+		n = src.n;
+		hashes = src.hashes;
+	}
 
+	ngram(ngram &&src) {
+		n = src.n;
+		hashes.swap(src.hashes);
+	}
+
+	int n;
 	std::vector<long> hashes;
 
 	static ngram intersect(const ngram &f, const ngram &s) {
-		ngram tmp;
+		ngram tmp(f.n);
 		tmp.hashes.resize(f.hashes.size());
 
 		auto inter = std::set_intersection(f.hashes.begin(), f.hashes.end(),
@@ -96,6 +109,8 @@ struct ngram {
 
 		return tmp;
 	}
+
+	MSGPACK_DEFINE(n, hashes);
 };
 
 #define NGRAM_START	1
@@ -129,7 +144,7 @@ class document_parser {
 
 				generate(text, i, hashes);
 
-				ngrams.emplace_back(hashes);
+				ngrams.emplace_back(i, hashes);
 			}
 		}
 
@@ -227,6 +242,17 @@ class document {
 	private:
 		int m_doc_id;
 		std::vector<ngram> m_ngrams;
+};
+
+struct learn_element {
+	learn_element() : valid(false) {
+	}
+
+	std::vector<int> doc_ids;
+	std::string request;
+	bool valid;
+
+	std::vector<int> features;
 };
 
 }} // namespace ioremap::similarity
