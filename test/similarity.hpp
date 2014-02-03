@@ -1,6 +1,7 @@
 #ifndef __WOOKIE_SIMILARITY_HPP
 #define __WOOKIE_SIMILARITY_HPP
 
+#include "wookie/hash.hpp"
 #include "wookie/parser.hpp"
 #include "wookie/lexical_cast.hpp"
 #include "wookie/timer.hpp"
@@ -170,55 +171,13 @@ class document_parser {
 					std::ostringstream ss;
 					std::copy(ngram.begin(), ngram.end(), std::ostream_iterator<std::string>(ss, ""));
 
-					hashes.emplace_back(hash(ss.str(), 0));
+					hashes.emplace_back(wookie::hash::murmur(ss.str(), 0));
 					ngram.pop_front();
 				}
 			}
 
 			std::set<long> tmp(hashes.begin(), hashes.end());
 			hashes.assign(tmp.begin(), tmp.end());
-		}
-
-
-		// murmur hash
-		long hash(const std::string &str, long seed) const {
-			const uint64_t m = 0xc6a4a7935bd1e995LLU;
-			const int r = 47;
-
-			long h = seed ^ (str.size() * m);
-
-			const uint64_t *data = (const uint64_t *)str.data();
-			const uint64_t *end = data + (str.size() / 8);
-
-			while (data != end) {
-				uint64_t k = *data++;
-
-				k *= m;
-				k ^= k >> r;
-				k *= m;
-
-				h ^= k;
-				h *= m;
-			}
-
-			const unsigned char *data2 = (const unsigned char *)data;
-
-			switch (str.size() & 7) {
-			case 7: h ^= (uint64_t)data2[6] << 48;
-			case 6: h ^= (uint64_t)data2[5] << 40;
-			case 5: h ^= (uint64_t)data2[4] << 32;
-			case 4: h ^= (uint64_t)data2[3] << 24;
-			case 3: h ^= (uint64_t)data2[2] << 16;
-			case 2: h ^= (uint64_t)data2[1] << 8;
-			case 1: h ^= (uint64_t)data2[0];
-				h *= m;
-			};
-
-			h ^= h >> r;
-			h *= m;
-			h ^= h >> r;
-
-			return h;
 		}
 };
 
