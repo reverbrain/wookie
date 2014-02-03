@@ -2,7 +2,9 @@
 
 #include "elliptics/session.hpp"
 
-#include <list>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 #include <boost/algorithm/string.hpp>
@@ -144,18 +146,27 @@ class loader {
 		std::vector<int> m_groups;
 
 		struct doc_thread {
+			static const int max_pending = 10;
 			int id;
 			int step;
+
+			std::atomic_int pending;
+			std::mutex lock;
+			std::condition_variable cond;
+
+			elliptics::session session;
+
+			doc_thread(elliptics::node &node) : session(node) {}
 		};
 
-		void load_documents(struct doc_thread &dth) {
+		void load_documents(std::shared_ptr<doc_thread> dth) {
 			document_parser parser;
-			elliptics::session session(m_node);
 
-			session.set_groups(m_groups);
-			session.set_exceptions_policy(elliptics::session::no_exceptions);
+			dth->session.set_groups(m_groups);
+			dth->session.set_exceptions_policy(elliptics::session::no_exceptions);
+			dth->session.set_ioflags(DNET_IO_FLAGS_CACHE);
 
-			for (size_t i = dth.id; i < m_doc_ids.size(); i += dth.step) {
+			for (size_t i = dth->id; i < m_doc_ids.size(); i += dth->step) {
 				simdoc doc;
 				doc.id = m_doc_ids[i];
 
@@ -170,18 +181,35 @@ class loader {
 					msgpack::sbuffer buffer;
 					msgpack::pack(&buffer, doc);
 
-					session.write_data(doc_id_str, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0)
-						.connect(std::bind(&loader::update_index, this, session, doc_id_str));
+					dth->session.write_data(doc_id_str, elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0)
+						.connect(std::bind(&loader::update_index, this, dth, doc_id_str));
+
+					dth->pending++;
+
+					if (dth->pending > doc_thread::max_pending) {
+						std::cout << "going to sleep: " << dth->pending << std::endl;
+						std::unique_lock<std::mutex> guard(dth->lock);
+						dth->cond.wait(guard);
+						std::cout << "going to sleep: " << dth->pending << std::endl;
+					}
+
 				} catch (const std::exception &e) {
 					std::cerr << file << ": caught exception: " << e.what() << std::endl;
 				}
 			}
 		}
 
-		void update_index(elliptics::session &session, const std::string &doc_id_str) {
+		void update_index(std::shared_ptr<doc_thread> dth, const std::string &doc_id_str) {
 			std::vector<elliptics::data_pointer> tmp;
 			tmp.resize(m_indexes.size());
-			session.set_indexes(doc_id_str, m_indexes, tmp);
+			dth->session.set_indexes(doc_id_str, m_indexes, tmp)
+				.connect(std::bind(&loader::update_index_completion, this, dth));
+		}
+
+		void update_index_completion(std::shared_ptr<doc_thread> dth) {
+			dth->pending--;
+			if (dth->pending < doc_thread::max_pending / 2)
+				dth->cond.notify_one();
 		}
 
 		void add_documents(int cpunum) {
@@ -190,10 +218,12 @@ class loader {
 			wookie::timer tm;
 
 			for (int i = 0; i < cpunum; ++i) {
-				struct doc_thread dth;
+				std::shared_ptr<doc_thread> dth = std::make_shared<doc_thread>(m_node);
 
-				dth.id = i;
-				dth.step = cpunum;
+				dth->id = i;
+				dth->step = cpunum;
+				dth->pending = 0;
+				dth->session = elliptics::session(m_node);
 
 				threads.emplace_back(std::bind(&loader::load_documents, this, dth));
 			}
