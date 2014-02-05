@@ -82,7 +82,7 @@ class ngram {
 			}
 		}
 
-		double lookup(const std::string &word) {
+		double lookup(const std::string &word) const {
 			double count = 1.0;
 
 			auto it = m_map.find(word);
@@ -91,6 +91,10 @@ class ngram {
 
 			count /= 2.0 * m_map.size();
 			return count;
+		}
+
+		size_t num(void) const {
+			return m_map.size();
 		}
 
 	private:
@@ -112,9 +116,12 @@ class probability {
 
 			m_n2.load(text);
 			m_n3.load(text);
+
+			printf("%s: loaded: %zd bytes, 2-grams: %zd, 3-grams: %zd\n",
+					filename, text.size(), m_n2.num(), m_n3.num());
 		}
 
-		double detect(const std::string &text) {
+		double detect(const std::string &text) const {
 			double p = 0;
 			for (size_t i = 3; i < text.size(); ++i) {
 				std::string s3 = text.substr(i - 3, 3);
@@ -126,16 +133,6 @@ class probability {
 			return abs(p);
 		}
 
-		double detect_file(const char *filename) {
-			std::ifstream in(filename, std::ios::binary);
-			std::ostringstream ss;
-			ss << in.rdbuf();
-
-			std::string text = ss.str();
-
-			return detect(text);
-		}
-
 	private:
 		ngram m_n2, m_n3;
 };
@@ -144,26 +141,37 @@ class detector {
 	public:
 		detector() {}
 
-		void load_file(const char *filename) {
+		void load_file(const char *filename, const char *id) {
 			probability p;
 			p.load_file(filename);
 
-			n_prob.emplace(filename, p);
+			n_prob.emplace(id, p);
 		}
 
-		std::string detect_file(const char *filename) {
+		std::string detect(const std::string &text) const {
 			double max_p = 0;
-			std::string name = "none";
+			std::string name = "";
 
 			for (auto it = n_prob.begin(); it != n_prob.end(); ++it) {
-				double p = it->second.detect_file(filename);
+				double p = it->second.detect(text);
 				if (p > max_p) {
 					name = it->first;
 					max_p = p;
 				}
+
+				printf("detect: encoding: %s, probability: %F\n", it->first.c_str(), p);
 			}
 
 			return name;
+		}
+
+		std::string detect_file(const char *filename) const {
+			std::ifstream in(filename, std::ios::binary);
+			std::ostringstream ss;
+			ss << in.rdbuf();
+
+			std::string text = ss.str();
+			return detect(text);
 		}
 
 	private:
