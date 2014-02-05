@@ -1,9 +1,11 @@
 #ifndef __WOOKIE_SIMILARITY_HPP
 #define __WOOKIE_SIMILARITY_HPP
 
+#include "wookie/iconv.hpp"
 #include "wookie/hash.hpp"
-#include "wookie/parser.hpp"
 #include "wookie/lexical_cast.hpp"
+#include "wookie/ngram.hpp"
+#include "wookie/parser.hpp"
 #include "wookie/timer.hpp"
 
 #include <algorithm>
@@ -12,73 +14,23 @@
 #include <sstream>
 #include <vector>
 
-#include <iconv.h>
-#include <string.h>
-
 #include <boost/locale.hpp>
 #include <boost/program_options.hpp>
 
 #include <msgpack.hpp>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <string.h>
+
 namespace ioremap { namespace similarity {
-
-class charset_convert {
-	public:
-		charset_convert(const char *to, const char *from) {
-			m_tmp.resize(128);
-
-			m_iconv = iconv_open(to, from);
-			if (m_iconv == (iconv_t)-1) {
-				int err = errno;
-				std::ostringstream ss;
-				ss << "invalid conversion: " <<
-					from << " -> " << to << " : " << strerror(err) << " [" << err << "]";
-				throw std::runtime_error(ss.str());
-			}
-		}
-
-		~charset_convert() {
-			iconv_close(m_iconv);
-		}
-
-		void reset(void) {
-			::iconv(m_iconv, NULL, NULL, NULL, NULL);
-		}
-
-		std::string convert(const std::string &in) {
-			char *src = const_cast<char *>(&in[0]);
-			size_t inleft = in.size();
-
-			std::ostringstream out;
-
-			while (inleft > 0) {
-				char *dst = const_cast<char *>(&m_tmp[0]);
-				size_t outleft = m_tmp.size();
-
-				size_t size = ::iconv(m_iconv, &src, &inleft, &dst, &outleft);
-
-				if (size == (size_t)-1) {
-					if (errno == EINVAL)
-						break;
-					if (errno == E2BIG)
-						continue;
-					if (errno == EILSEQ) {
-						src++;
-						inleft--;
-						continue;
-					}
-				}
-
-				out.write(m_tmp.c_str(), m_tmp.size() - outleft);
-			}
-
-			return out.str();
-		}
-
-	private:
-		iconv_t m_iconv;
-		std::string m_tmp;
-};
 
 struct ngram {
 	ngram(int n, std::vector<long> &h) : n(n) {
@@ -123,6 +75,33 @@ class document_parser {
 		document_parser() : m_loc(m_gen("en_US.UTF8")) {
 		}
 
+		void load_encodings(const std::string &base) {
+			int fd;
+			DIR *dir;
+			struct dirent64 *d;
+
+			fd = openat(AT_FDCWD, base.c_str(), O_RDONLY);
+			if (fd == -1) {
+				std::ostringstream ss;
+				ss << "failed to open dir '" << base << "': " << strerror(errno);
+				throw std::runtime_error(ss.str());
+			}
+
+			dir = fdopendir(fd);
+
+			while ((d = readdir64(dir)) != NULL) {
+				if (d->d_name[0] == '.' && d->d_name[1] == '\0')
+					continue;
+				if (d->d_name[0] == '.' && d->d_name[1] == '.' && d->d_name[2] == '\0')
+					continue;
+
+				if (d->d_type != DT_DIR) {
+					m_charset_detector.load_file((base + "/" + d->d_name).c_str(), d->d_name);
+				}
+			}
+			close(fd);
+		}
+
 		void feed(const char *path, const std::string &enc) {
 			std::ifstream in(path);
 			if (in.bad())
@@ -136,7 +115,18 @@ class document_parser {
 		}
 
 		std::string text(void) const {
-			return m_parser.text(" ");
+			std::string text = m_parser.text(" ");
+			std::string enc = m_charset_detector.detect(text);
+			printf("encoding: %s\n", enc.c_str());
+			if (enc.size() && enc != "utf8") {
+				wookie::charset_convert convert("utf8", enc.c_str());
+
+				std::string out = convert.convert(text);
+				if (out.size() > text.size() / 3)
+					return out;
+			}
+
+			return text;
 		}
 
 		void generate_ngrams(const std::string &text, std::vector<ngram> &ngrams) {
@@ -152,6 +142,7 @@ class document_parser {
 
 	private:
 		wookie::parser m_parser;
+		wookie::ngram::detector m_charset_detector;
 		boost::locale::generator m_gen;
 		std::locale m_loc;
 
