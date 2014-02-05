@@ -17,12 +17,16 @@
 #ifndef __WOOKIE_NGRAM_HPP
 #define __WOOKIE_NGRAM_HPP
 
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <string>
+#include <sstream>
 #include <vector>
 
-namespace ioremap { namespace wookie {
+#include <math.h>
+
+namespace ioremap { namespace wookie { namespace ngram {
 
 struct ncount {
 	std::string	word;
@@ -31,67 +35,141 @@ struct ncount {
 
 class ngram {
 	public:
-		static std::map<std::string, int> load_map(const std::string &text, int ngram) {
-			std::map<std::string, int> nc;
+		ngram(int n) : m_n(n) {}
 
-			if (text.size() >= (size_t)ngram) {
+		static std::vector<std::string> split(const std::string &text, size_t ngram) {
+			std::vector<std::string> ret;
+
+			if (text.size() >= ngram) {
 				for (size_t i = 0; i < text.size() - ngram + 1; ++i) {
 					std::string word = text.substr(i, ngram);
-					auto it = nc.find(word);
-					if (it == nc.end())
-						nc[word] = 1;
-					else
-						it->second++;
+					ret.emplace_back(word);
 				}
 			}
 
-			return nc;
+			return ret;
 		}
 
-		static std::vector<ncount> convert(const std::map<std::string, int> &ncmap) {
-			std::vector<ncount> ncvec;
-			ncvec.reserve(ncmap.size());
+		void load(const std::string &text) {
+			std::vector<std::string> grams = ngram::split(text, m_n);
+			for (auto word = grams.begin(); word != grams.end(); ++word) {
+				auto it = m_map.find(*word);
+				if (it == m_map.end())
+					m_map[*word] = 1;
+				else
+					it->second++;
+			}
 
-			for (auto it = ncmap.begin(); it != ncmap.end(); ++it) {
+			//printf("text: %zd bytes, loaded %zd %d-grams\n", text.size(), grams.size(), m_n);
+		}
+
+		void load(const std::vector<std::string> &words) {
+			for (auto word = words.begin(); word != words.end(); ++word) {
+				load(*word);
+			}
+		}
+
+		void convert(void) {
+			m_vec.clear();
+			m_vec.reserve(m_map.size());
+
+			for (auto it = m_map.begin(); it != m_map.end(); ++it) {
 				ncount nc;
 				nc.word = it->first;
 				nc.count = it->second;
 
-				ncvec.emplace_back(nc);
+				m_vec.emplace_back(nc);
+			}
+		}
+
+		double lookup(const std::string &word) {
+			double count = 1.0;
+
+			auto it = m_map.find(word);
+			if (it != m_map.end())
+				count += it->second;
+
+			count /= 2.0 * m_map.size();
+			return count;
+		}
+
+	private:
+		int m_n;
+		std::map<std::string, int> m_map;
+		std::vector<ncount> m_vec;
+};
+
+class probability {
+	public:
+		probability() : m_n2(2), m_n3(3) {}
+
+		void load_file(const char *filename) {
+			std::ifstream in(filename, std::ios::binary);
+			std::ostringstream ss;
+			ss << in.rdbuf();
+
+			std::string text = ss.str();
+
+			m_n2.load(text);
+			m_n3.load(text);
+		}
+
+		double detect(const std::string &text) {
+			double p = 0;
+			for (size_t i = 3; i < text.size(); ++i) {
+				std::string s3 = text.substr(i - 3, 3);
+				std::string s2 = text.substr(i - 3, 2);
+
+				p += log(m_n3.lookup(s3) / m_n2.lookup(s2));
 			}
 
-			return ncvec;
+			return abs(p);
 		}
 
-		static std::vector<ncount> load(const std::string &text, int ngram) {
-			std::map<std::string, int> ncmap = load_map(text, ngram);
-			return std::move(convert(ncmap));
+		double detect_file(const char *filename) {
+			std::ifstream in(filename, std::ios::binary);
+			std::ostringstream ss;
+			ss << in.rdbuf();
+
+			std::string text = ss.str();
+
+			return detect(text);
 		}
 
-		static std::map<std::string, int> load_map(const std::vector<std::string> &words, int ngram) {
-			std::map<std::string, int> nc;
+	private:
+		ngram m_n2, m_n3;
+};
 
-			for (auto word = words.begin(); word != words.end(); ++word) {
-				std::map<std::string, int> tmp_map = load_map(*word, ngram);
+class detector {
+	public:
+		detector() {}
 
-				for (auto tmp = tmp_map.begin(); tmp != tmp_map.end(); ++tmp) {
-					auto it = nc.find(tmp->first);
-					if (it == nc.end())
-						nc[tmp->first] = tmp->second;
-					else
-						it->second += tmp->second;
+		void load_file(const char *filename) {
+			probability p;
+			p.load_file(filename);
+
+			n_prob.emplace(filename, p);
+		}
+
+		std::string detect_file(const char *filename) {
+			double max_p = 0;
+			std::string name = "none";
+
+			for (auto it = n_prob.begin(); it != n_prob.end(); ++it) {
+				double p = it->second.detect_file(filename);
+				if (p > max_p) {
+					name = it->first;
+					max_p = p;
 				}
 			}
 
-			return nc;
+			return name;
 		}
 
-		static std::vector<ncount> load(const std::vector<std::string> &words, int ngram) {
-			std::map<std::string, int> ncmap = load_map(words, ngram);
-			return std::move(convert(ncmap));
-		}
+	private:
+		std::map<std::string, probability> n_prob;
 };
 
-}} // namespace ioremap::wookie
+}}} // namespace ioremap::wookie::ngram
 
 #endif /* __WOOKIE_NGRAM_HPP */

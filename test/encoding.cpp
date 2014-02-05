@@ -1,10 +1,6 @@
 #include "wookie/ngram.hpp"
 
-#include <boost/locale.hpp>
 #include <boost/program_options.hpp>
-
-#include <fstream>
-#include <sstream>
 
 using namespace ioremap;
 
@@ -14,16 +10,30 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Encoding detector options");
 
-	std::string input;
+	std::string input, detect;
 	generic.add_options()
 		("help", "This help message")
-		("input-file", bpo::value<std::string>(&input)->required(), "Input file")
+		("detect-file", bpo::value<std::string>(&detect)->required(), "File with unknown encoding")
 		;
+
+	bpo::positional_options_description p;
+	p.add("files", -1);
+
+	std::vector<std::string> files;
+	bpo::options_description hidden("Hidden options");
+	hidden.add_options()
+		("files", bpo::value<std::vector<std::string>>(&files), "files to parse")
+	;
 
 	bpo::variables_map vm;
 
 	try {
-		bpo::store(bpo::parse_command_line(argc, argv, generic), vm);
+
+		bpo::options_description cmdline_options;
+		cmdline_options.add(generic).add(hidden);
+
+		bpo::store(bpo::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
+
 		if (vm.count("help")) {
 			std::cout << generic << std::endl;
 			return 0;
@@ -35,28 +45,19 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	if (!files.size()) {
+		std::cerr << "You must provide input files for different languages/encodings for statistics\n" << generic << std::endl;
+		return -1;
+	}
+
 	try {
-		std::ifstream in(input.c_str());
-		std::ostringstream ss;
+		wookie::ngram::detector d;
 
-		ss << in.rdbuf();
-		std::string text = ss.str();
+		for (auto f = files.begin(); f != files.end(); ++f)
+			d.load_file(f->c_str());
 
-		boost::locale::generator gen;
-		std::locale loc(gen("en_US.UTF8"));
-
-		namespace lb = boost::locale::boundary;
-
-		lb::ssegment_index wmap(lb::word, text.begin(), text.end(), loc);
-		wmap.rule(lb::word_any);
-
-		std::vector<std::string> words;
-		for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-			std::string token = boost::locale::to_lower(it->str(), loc);
-			words.emplace_back(token);
-		}
-
-		std::map<std::string, int> nc = wookie::ngram::load_map(words, 3);
+		auto p = d.detect_file(detect.c_str());
+		printf("%s: %s\n", detect.c_str(), p.c_str());
 	} catch (const std::exception &e) {
 		std::cerr << "Caught exception: " << e.what() << std::endl;
 		return -1;
