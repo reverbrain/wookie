@@ -49,3 +49,8 @@ target_link_libraries(wookie_html_parser
 	${LIBXML2_LIBRARIES}
 	${Boost_LIBRARIES}
 )
+
+add_executable(wookie_encoding encoding.cpp)
+target_link_libraries(wookie_encoding
+	${Boost_LIBRARIES}
+)
