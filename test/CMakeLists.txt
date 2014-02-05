@@ -34,6 +34,10 @@ target_link_libraries(wookie_data_iterator
 	-pthread
 )
 
+INCLUDE(../cmake/locate_library.cmake)
+LOCATE_LIBRARY(DLIB "dlib/svm.h" "")
+include_directories(${DLIB_INCLUDE_DIRS})
+
 add_executable(wookie_similarity similarity.cpp)
 target_link_libraries(wookie_similarity
 	${LIBXML2_LIBRARIES}
