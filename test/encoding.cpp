@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		wookie::ngram::detector d;
 
 		for (auto f = files.begin(); f != files.end(); ++f)
-			d.load_file(f->c_str());
+			d.load_file(f->c_str(), f->c_str());
 
 		auto p = d.detect_file(detect.c_str());
 		printf("%s: %s\n", detect.c_str(), p.c_str());
