@@ -109,7 +109,7 @@ class dlib_learner {
 
 class learner {
 	public:
-		learner(const std::string &input, const std::string &learn_file, const std::string &output) : m_input(input) {
+		learner(const std::string &input, const std::string &learn_file, const std::string &output, const std::string &enc_dir) : m_input(input), m_enc_dir(enc_dir) {
 			srand(time(NULL));
 
 			std::ifstream in(learn_file.c_str());
@@ -176,6 +176,7 @@ class learner {
 	private:
 		std::string m_input;
 		std::vector<document> m_documents;
+		std::string m_enc_dir;
 
 		std::map<int, int> m_id_position;
 
@@ -189,6 +190,7 @@ class learner {
 
 		void load_documents(struct doc_thread &dth) {
 			document_parser parser;
+			parser.load_encodings(m_enc_dir);
 
 			for (size_t i = dth.id; i < m_documents.size(); i += dth.step) {
 				document & doc = m_documents[i];
@@ -207,6 +209,7 @@ class learner {
 
 		void load_elements(struct doc_thread &dth) {
 			document_parser parser;
+			parser.load_encodings(m_enc_dir);
 
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
@@ -311,10 +314,12 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Similarity options");
 
-	std::string mode, input, learn_file, learn_output;
+	std::string mode, input, learn_file, learn_output, encoding_dir;
 	generic.add_options()
 		("help", "This help message")
-		("input", bpo::value<std::string>(&input), "Input directory")
+		("input", bpo::value<std::string>(&input)->required(), "Input directory")
+		("encoding-dir", bpo::value<std::string>(&encoding_dir), "Directory with charset samples")
+
 		("learn", bpo::value<std::string>(&learn_file), "Learning data file")
 		("learn-output", bpo::value<std::string>(&learn_output), "Learning output file")
 		("mode", bpo::value<std::string>(&mode)->default_value("learn"), "Processing mode: learn/check")
@@ -341,7 +346,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (mode == "learn") {
-		learner l(input, learn_file, learn_output);
+		learner l(input, learn_file, learn_output, encoding_dir);
 		return -1;
 	}
 #if 0
