@@ -29,7 +29,7 @@ namespace ioremap { namespace wookie {
 class charset_convert {
 	public:
 		charset_convert(const char *to, const char *from) {
-			m_tmp.resize(128);
+			m_tmp.resize(4096);
 
 			m_iconv = iconv_open(to, from);
 			if (m_iconv == (iconv_t)-1) {
@@ -59,9 +59,13 @@ class charset_convert {
 				char *dst = const_cast<char *>(&m_tmp[0]);
 				size_t outleft = m_tmp.size();
 
-				size_t size = ::iconv(m_iconv, &src, &inleft, &dst, &outleft);
+				ssize_t size = ::iconv(m_iconv, &src, &inleft, &dst, &outleft);
 
-				if (size == (size_t)-1) {
+				//printf("size: %zd, inleft: %zd, outleft: %zd, errno: %d, data: %.*s\n", size, inleft, outleft, errno, (int)(m_tmp.size() - outleft), m_tmp.c_str());
+				if (outleft < m_tmp.size())
+					out.write(m_tmp.c_str(), m_tmp.size() - outleft);
+
+				if (size == -1) {
 					if (errno == EINVAL)
 						break;
 					if (errno == E2BIG)
@@ -72,8 +76,6 @@ class charset_convert {
 						continue;
 					}
 				}
-
-				out.write(m_tmp.c_str(), m_tmp.size() - outleft);
 			}
 
 			return out.str();
