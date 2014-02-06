@@ -145,7 +145,7 @@ class detector {
 			probability p;
 			p.load_file(filename);
 
-			n_prob.emplace(id, p);
+			n_prob[id] = p;
 		}
 
 		std::string detect(const std::string &text) const {
