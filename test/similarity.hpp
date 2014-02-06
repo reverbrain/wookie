@@ -80,6 +80,9 @@ class document_parser {
 			DIR *dir;
 			struct dirent64 *d;
 
+			if (base.size() == 0)
+				return;
+
 			fd = openat(AT_FDCWD, base.c_str(), O_RDONLY);
 			if (fd == -1) {
 				std::ostringstream ss;
