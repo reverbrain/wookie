@@ -161,7 +161,10 @@ class learner {
 			printf("pairs loaded: %zd\n", m_elements.size());
 			m_negative_elements.resize(m_elements.size());
 
-			add_documents(std::thread::hardware_concurrency());
+			int num = std::thread::hardware_concurrency();
+			if (num == 0)
+				num = sysconf(_SC_NPROCESSORS_ONLN);
+			add_documents(num);
 
 			dlib_learner dl;
 
