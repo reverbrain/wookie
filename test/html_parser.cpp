@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	xmlInitParser();
 	document_parser parser;
 
 	if (enc_dir.size())

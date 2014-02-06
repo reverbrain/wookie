@@ -17,8 +17,9 @@
 #ifndef __WOOKIE_PARSER_HPP
 #define __WOOKIE_PARSER_HPP
 
-#include <libxml/xmlstring.h>
-#include <libxml/HTMLparser.h>
+#include <buffio.h>
+#include <tidy.h>
+#include <tidyenum.h>
 
 #include <algorithm>
 #include <cstring>
@@ -35,13 +36,9 @@ namespace ioremap { namespace wookie {
 class parser {
 	public:
 		parser() {
-			m_ctx = htmlNewParserCtxt();
-			if (!m_ctx)
-				throw std::runtime_error("could not allocate new parser context");
 		}
 
 		~parser() {
-			htmlFreeParserCtxt(m_ctx);
 		}
 
 		void parse(const std::string &page, const std::string &encoding) {
@@ -50,21 +47,26 @@ class parser {
 			if (page.size() == 0)
 				return;
 
-			int options = HTML_PARSE_RECOVER | HTML_PARSE_NOBLANKS |
-				HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING |
-				HTML_PARSE_NONET | HTML_PARSE_COMPACT;
-			if (encoding.size())
-				options |= HTML_PARSE_IGNORE_ENC;
+			TidyBuffer errbuf;
+			TidyDoc tdoc = tidyCreate();
 
-			htmlDocPtr doc = htmlCtxtReadMemory(m_ctx, page.c_str(), page.size(),
-					"url", encoding.c_str(), options);
-			if (doc == NULL)
-				throw std::runtime_error("could not parse page");
+			tidyBufInit(&errbuf);
 
-			htmlNodePtr root = xmlDocGetRootElement(doc);
-			traverse_tree(root);
+			tidySetCharEncoding(tdoc, encoding.size() ? encoding.c_str() : "raw");
+			tidyOptSetBool(tdoc, TidyXhtmlOut, yes);
+			tidySetErrorBuffer(tdoc, &errbuf);
 
-			xmlFreeDoc(doc);
+			int err = tidyParseString(tdoc, page.c_str());
+			if (err < 0) {
+				tidyBufFree(&errbuf);
+				std::ostringstream ss;
+				ss << "Failed to parse page: " << err;
+				throw std::runtime_error(ss.str());
+			}
+
+			TidyNode html = tidyGetHtml(tdoc);
+			traverse_tree(tdoc, html);
+			tidyBufFree(&errbuf);
 		}
 
 		const std::vector<std::string> &urls(void) const {
@@ -85,39 +87,41 @@ class parser {
 	private:
 		std::vector<std::string> m_urls;
 		std::vector<std::string> m_tokens;
-		htmlParserCtxtPtr m_ctx;
-
 
 		void reset(void) {
 			m_urls.clear();
 			m_tokens.clear();
 		}
 
-		void traverse_tree(htmlNodePtr start) {
-			for (htmlNodePtr node = start; node; node = node->next) {
-#ifdef STDOUT_DEBUG
-				printf("%d: type: %d, name: %s, content: %s\n",
-					node->line, node->type, (char *)node->name, (char *)node->content);
-#endif
-				if (node->type == XML_TEXT_NODE) {
-					m_tokens.push_back((char *)node->content);
+		void traverse_tree(TidyDoc tdoc, TidyNode tnode) {
+			TidyNode child;
+
+			for (child = tidyGetChild(tnode); child; child = tidyGetNext(child)) {
+				TidyAttr href;
+				if (tidyNodeIsLINK(child) && 0) {
+					href = tidyAttrGetHREF(child);
+					m_urls.push_back(tidyAttrValue(href));
 				}
 
-				if (node->type == XML_ELEMENT_NODE) {
-					if (!xmlStrcmp(node->name, (xmlChar *)"a")) {
-						xmlChar *data = xmlGetProp(node, (xmlChar *)"href");
-						if (data) {
-#ifdef STDOUT_DEBUG
-							printf("%d: link: %s\n",
-								node->line, (char *)data);
-#endif
-							m_urls.push_back((char *)data);
-							xmlFree(data);
-						}
+				if (tidyNodeIsSCRIPT(child) || tidyNodeIsSTYLE(child)) {
+					continue;
+				}
+
+				if (tidyNodeIsText(child)) {
+					if (tidyNodeHasText(tdoc, child)) {
+						TidyBuffer buf;
+						tidyBufInit(&buf);
+
+						tidyNodeGetText(tdoc, child, &buf);
+						std::string text;
+						text.assign((char *)buf.bp, buf.size);
+						m_tokens.emplace_back(text);
+
+						tidyBufFree(&buf);
 					}
 				}
 
-				traverse_tree(node->children);
+				traverse_tree(tdoc, child);
 			}
 		}
 

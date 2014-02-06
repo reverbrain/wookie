@@ -340,8 +340,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	xmlInitParser();
-
 	if (mode == "learn") {
 		learner l(input, learn_file, learn_output);
 		return -1;

@@ -40,13 +40,13 @@ include_directories(${DLIB_INCLUDE_DIRS})
 
 add_executable(wookie_similarity similarity.cpp)
 target_link_libraries(wookie_similarity
-	${LIBXML2_LIBRARIES}
+	${LIBTIDY_LIBRARIES}
 	${Boost_LIBRARIES}
 )
 
 add_executable(wookie_html_parser html_parser.cpp)
 target_link_libraries(wookie_html_parser
-	${LIBXML2_LIBRARIES}
+	${LIBTIDY_LIBRARIES}
 	${Boost_LIBRARIES}
 )
 

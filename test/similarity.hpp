@@ -117,11 +117,14 @@ class document_parser {
 		std::string text(void) const {
 			std::string text = m_parser.text(" ");
 			std::string enc = m_charset_detector.detect(text);
-			printf("encoding: %s\n", enc.c_str());
+			//printf("encoding: %s, text-length: %zd\n", enc.c_str(), text.size());
+
 			if (enc.size() && enc != "utf8") {
 				wookie::charset_convert convert("utf8", enc.c_str());
 
 				std::string out = convert.convert(text);
+				//printf("coverted: %s -> %s, %zd -> %zd\n", enc.c_str(), "utf8", text.size(), out.size());
+
 				if (out.size() > text.size() / 3)
 					return out;
 			}

@@ -23,7 +23,7 @@ LOCATE_LIBRARY(SWARM_XML "swarm/xml/url_finder.hpp" "swarm_xml")
 LOCATE_LIBRARY(SWARM_URLFETCHER "swarm/urlfetcher/url_fetcher.hpp" "swarm_urlfetcher")
 LOCATE_LIBRARY(MSGPACK "msgpack.hpp" "msgpack")
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
-LOCATE_LIBRARY(LIBXML2 "libxml/xpath.h" "xml2" "libxml2")
+LOCATE_LIBRARY(LIBTIDY "tidy.h" "tidy")
 LOCATE_LIBRARY(LIBMAGIC "magic.h" "magic")
 LOCATE_LIBRARY(THEVOID "thevoid/server.hpp" "thevoid")
 LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
@@ -42,7 +42,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include
 	${LIBEV_INCLUDE_DIRS}	
 	${SWARM_INCLUDE_DIRS}
 	${grape_INCLUDE_DIRS}
-	${LIBXML2_INCLUDE_DIRS}
+	${LIBTIDY_INCLUDE_DIRS}
 	${MSGPACK_INCLUDE_DIRS}
 	${cld_INCLUDE_DIRS}
 	${ELLIPTICS_INCLUDE_DIRS}
@@ -59,7 +59,7 @@ link_directories(
 	${SWARM_LIBRARY_DIRS}
 	${grape_LIBRARY_DIRS}
 	${cld_LIBRARY_DIRS}
-	${LIBXML2_LIBRARY_DIRS}
+	${LIBTIDY_LIBRARY_DIRS}
 	${MSGPACK_LIBRARY_DIRS}
 	${LIBMAGIC_LIBRARY_DIRS}
 	${THEVOID_LIBRARY_DIRS}
