@@ -79,7 +79,7 @@ class loader {
 					std::unique_lock<std::mutex> guard(m_lock);
 					m_documents.emplace_back(doc);
 				} catch (const std::exception &e) {
-					std::cerr << "exception: " << w.what() << std::endl;
+					std::cerr << "exception: " << e.what() << std::endl;
 				}
 			}
 		}
