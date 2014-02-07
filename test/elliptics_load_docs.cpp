@@ -68,14 +68,20 @@ class loader {
 		std::vector<int> m_groups;
 
 		void result_callback(const elliptics::read_result_entry &result) {
-			msgpack::unpacked msg;
-			msgpack::unpack(&msg, result.data<char>(), result.size());
+			if (result.size()) {
+				try {
+					msgpack::unpacked msg;
+					msgpack::unpack(&msg, result.data<char>(), result.size());
 
-			simdoc doc;
-			msg.get().convert(&doc);
+					simdoc doc;
+					msg.get().convert(&doc);
 
-			std::unique_lock<std::mutex> guard(m_lock);
-			m_documents.emplace_back(doc);
+					std::unique_lock<std::mutex> guard(m_lock);
+					m_documents.emplace_back(doc);
+				} catch (const std::exception &e) {
+					std::cerr << "exception: " << w.what() << std::endl;
+				}
+			}
 		}
 
 		void final_callback(const elliptics::error_info &error) {
