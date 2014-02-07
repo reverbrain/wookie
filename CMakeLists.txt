@@ -7,7 +7,7 @@ string(REGEX MATCH "([0-9]+\\.[0-9]+\\.[0-9]+)" DEBFULLVERSION "${DEBCHANGELOG}"
 STRING (REGEX MATCH "([0-9]+\\.[0-9]+)" WOOKIE_VERSION_MAJOR "${DEBFULLVERSION}")
 STRING (REGEX MATCH "([0-9]+$)" WOOKIE_VERSION_MINOR "${DEBFULLVERSION}")
 
-set(CMAKE_CXX_FLAGS "-g -std=c++11 -W -Wall -Wextra -fstack-protector-all")
+set(CMAKE_CXX_FLAGS "-g -std=c++0x -W -Wall -Wextra -fstack-protector-all")
 
 option(WITH_HTTPSERVER "Build http server" ON)
 
