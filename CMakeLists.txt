@@ -9,10 +9,11 @@ STRING (REGEX MATCH "([0-9]+$)" WOOKIE_VERSION_MINOR "${DEBFULLVERSION}")
 
 set(CMAKE_CXX_FLAGS "-g -std=c++11 -W -Wall -Wextra -fstack-protector-all")
 
+option(WITH_HTTPSERVER "Build http server" ON)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 find_package(Boost REQUIRED COMPONENTS system thread locale program_options)
-#find_package(grape REQUIRED)
 find_package(msgpack REQUIRED)
 find_package(elliptics REQUIRED)
 find_package(compact-language-detector-devel REQUIRED)
@@ -25,10 +26,11 @@ LOCATE_LIBRARY(MSGPACK "msgpack.hpp" "msgpack")
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 LOCATE_LIBRARY(LIBTIDY "tidy.h" "tidy" "tidy")
 LOCATE_LIBRARY(LIBMAGIC "magic.h" "magic")
+if (WITH_HTTPSERVER)
 LOCATE_LIBRARY(THEVOID "thevoid/server.hpp" "thevoid")
 LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
-LOCATE_LIBRARY(WARP "warp/lex.hpp" "")
-LOCATE_LIBRARY(WARP "rift/server.hpp" "rift")
+LOCATE_LIBRARY(RIFT "rift/server.hpp" "rift")
+endif()
 
 FILE(GLOB headers
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/wookie/*.hpp"
@@ -70,8 +72,8 @@ link_directories(
 add_subdirectory(lib)
 add_subdirectory(stem)
 
-# only enabled for C++
-add_definitions(-std=c++0x)
-add_subdirectory(grape)
 add_subdirectory(test)
+
+if (WITH_HTTPSERVER)
 add_subdirectory(httpserver)
+endif()
