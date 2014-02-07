@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Similarity options");
 
-	std::string input_dir, learn_file, index;
+	std::string input_dir, pairs, index;
 	std::string remote, group_string;
 	std::string log_file;
 	int log_level;
@@ -201,11 +201,11 @@ int main(int argc, char *argv[])
 	generic.add_options()
 		("help", "This help message")
 		("input-dir", bpo::value<std::string>(&input_dir)->required(), "Input directory")
-		("learn", bpo::value<std::string>(&learn_file)->required(), "Learning data file")
+		("pairs", bpo::value<std::string>(&pairs)->required(), "Pairs data file")
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
 
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
-		("groups", bpo::value<std::string>(&group_string)->required(), "Colon seaprated list of groups")
+		("groups", bpo::value<std::string>(&group_string)->required(), "Colon separated list of groups")
 		("log", bpo::value<std::string>(&log_file)->default_value("/dev/stdout"), "Elliptics log file")
 		("log-level", bpo::value<int>(&log_level)->default_value(DNET_LOG_INFO), "Elliptics log-level")
 		;
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 
 	try {
 		loader el(remote, group_string, log_file, log_level);
-		el.load(index, input_dir, learn_file);
+		el.load(index, input_dir, pairs);
 
 	} catch (const std::exception &e) {
 		std::cerr << "exception: " << e.what() << std::endl;
