@@ -66,7 +66,9 @@ class parser {
 
 			TidyNode html = tidyGetHtml(tdoc);
 			traverse_tree(tdoc, html);
+
 			tidyBufFree(&errbuf);
+			tidyRelease(tdoc);
 		}
 
 		const std::vector<std::string> &urls(void) const {
