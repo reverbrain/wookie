@@ -116,9 +116,10 @@ class probability {
 
 			m_n2.load(text);
 			m_n3.load(text);
-
+#if 0
 			printf("%s: loaded: %zd bytes, 2-grams: %zd, 3-grams: %zd\n",
 					filename, text.size(), m_n2.num(), m_n3.num());
+#endif
 		}
 
 		double detect(const std::string &text) const {
@@ -158,8 +159,6 @@ class detector {
 					name = it->first;
 					max_p = p;
 				}
-
-				printf("detect: encoding: %s, probability: %F\n", it->first.c_str(), p);
 			}
 
 			return name;
