@@ -5,7 +5,7 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#include <dlib/svm_threaded.h>
+#include <dlib/svm.h>
 #pragma GCC diagnostic pop
 
 using namespace ioremap;
@@ -38,6 +38,7 @@ class dlib_learner {
 				m_samples[i] = normalizer(m_samples[i]);
 
 			dlib::krr_trainer<kernel_type> trainer;
+			trainer.be_verbose();
 			trainer.use_classification_loss_for_loo_cv();
 
 			typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
@@ -55,7 +56,7 @@ class dlib_learner {
 
 			pfunct_type learned_function;
 			learned_function.normalizer = normalizer;
-			learned_function.function = dlib::train_probabilistic_decision_function(trainer, m_samples, m_labels, 3);
+			learned_function.function = dlib::train_probabilistic_decision_function(trainer, m_samples, m_labels, 5);
 
 			std::cout << "\nnumber of basis vectors in our learned_function is " 
 				<< learned_function.function.decision_funct.basis_vectors.size() << std::endl;
