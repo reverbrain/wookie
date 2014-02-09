@@ -71,7 +71,9 @@ class loader {
 			if (result.size()) {
 				try {
 					msgpack::unpacked msg;
-					msgpack::unpack(&msg, result.data<char>(), result.size());
+					const elliptics::data_pointer &tmp = result.file();
+
+					msgpack::unpack(&msg, tmp.data<char>(), tmp.size());
 
 					simdoc doc;
 					msg.get().convert(&doc);
@@ -79,7 +81,9 @@ class loader {
 					std::unique_lock<std::mutex> guard(m_lock);
 					m_documents.emplace_back(doc);
 				} catch (const std::exception &e) {
-					std::cerr << "exception: " << e.what() << std::endl;
+					fprintf(stderr, "exception: id: %s, object-size: %zd, error: %s\n",
+							dnet_dump_id_str(result.io_attribute()->id), result.size(), e.what());
+							
 				}
 			}
 		}
