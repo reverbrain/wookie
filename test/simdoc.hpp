@@ -28,8 +28,9 @@ namespace msgpack
 static inline ioremap::similarity::simdoc &operator >>(msgpack::object o, ioremap::similarity::simdoc &doc)
 {
 	if (o.type != msgpack::type::ARRAY || o.via.array.size != 4)
-		ioremap::elliptics::throw_error(-EPROTO, "msgpack: simdoc array size mismatch: compiled: %d, unpacked: %d",
-				4, o.via.array.size);
+		ioremap::elliptics::throw_error(-EPROTO, "msgpack: simdoc type (compiled: %d, unpacked: %d) "
+				"or array size mismatch: compiled: %d, unpacked: %d",
+				msgpack::type::ARRAY, o.type, 4, o.via.array.size);
 
 	object *p = o.via.array.ptr;
 
