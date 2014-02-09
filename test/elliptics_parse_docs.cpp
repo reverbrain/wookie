@@ -31,7 +31,7 @@ class loader {
 			std::transform(gr.begin(), gr.end(), std::back_inserter<std::vector<int>>(m_groups), digitizer());
 		}
 
-		void load(const std::string &index, const std::string &input_dir, const std::string &learn_file) {
+		void load(const std::string &index, const std::string &input_dir, const std::string &learn_file, int max_line_num) {
 			std::ifstream in(learn_file.c_str());
 
 			m_indexes.clear();
@@ -42,7 +42,7 @@ class loader {
 
 			std::string line;
 			int line_num = 0;
-			while (std::getline(in, line)) {
+			while ((line_num < max_line_num) && std::getline(in, line)) {
 				if (!in.good())
 					break;
 
@@ -76,11 +76,11 @@ class loader {
 
 			m_doc_ids.assign(ids.begin(), ids.end());
 
-			int num = std::thread::hardware_concurrency();
-			if (num == 0)
-				num = sysconf(_SC_NPROCESSORS_ONLN);
+			int cpunum = std::thread::hardware_concurrency();
+			if (cpunum == 0)
+				cpunum = sysconf(_SC_NPROCESSORS_ONLN);
 
-			add_documents(num);
+			add_documents(cpunum);
 		}
 
 	private:
@@ -145,6 +145,12 @@ class loader {
 					std::cerr << file << ": caught exception: " << e.what() << std::endl;
 				}
 			}
+
+			while (dth->pending) {
+				std::cout << "waiting for pending requests: " << dth->pending << std::endl;
+				std::unique_lock<std::mutex> guard(dth->lock);
+				dth->cond.wait(guard);
+			}
 		}
 
 		void update_index(std::shared_ptr<doc_thread> dth, const std::string &doc_id_str) {
@@ -197,12 +203,14 @@ int main(int argc, char *argv[])
 	std::string remote, group_string;
 	std::string log_file;
 	int log_level;
+	int num;
 
 	generic.add_options()
 		("help", "This help message")
 		("input-dir", bpo::value<std::string>(&input_dir)->required(), "Input directory")
 		("pairs", bpo::value<std::string>(&pairs)->required(), "Pairs data file")
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
+		("num", bpo::value<int>(&num)->default_value(2), "Number of pairs to read")
 
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
 		("groups", bpo::value<std::string>(&group_string)->required(), "Colon separated list of groups")
@@ -227,7 +235,7 @@ int main(int argc, char *argv[])
 
 	try {
 		loader el(remote, group_string, log_file, log_level);
-		el.load(index, input_dir, pairs);
+		el.load(index, input_dir, pairs, num);
 
 	} catch (const std::exception &e) {
 		std::cerr << "exception: " << e.what() << std::endl;
