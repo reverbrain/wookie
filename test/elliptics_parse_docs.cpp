@@ -31,7 +31,10 @@ class loader {
 			std::transform(gr.begin(), gr.end(), std::back_inserter<std::vector<int>>(m_groups), digitizer());
 		}
 
-		void load(const std::string &index, const std::string &input_dir, const std::string &learn_file, int max_line_num) {
+		void load(const std::string &index, const std::string &encoding_dir,
+				const std::string &input_dir, const std::string &learn_file, int max_line_num) {
+			m_encoding_dir = encoding_dir;
+
 			std::ifstream in(learn_file.c_str());
 
 			m_indexes.clear();
@@ -85,6 +88,7 @@ class loader {
 
 	private:
 		std::vector<int> m_doc_ids;
+		std::string m_encoding_dir;
 
 		std::vector<std::string> m_indexes;
 		std::string m_input_dir;
@@ -109,6 +113,7 @@ class loader {
 
 		void load_documents(std::shared_ptr<doc_thread> dth) {
 			document_parser parser;
+			parser.load_encodings(m_encoding_dir);
 
 			dth->session.set_groups(m_groups);
 			dth->session.set_exceptions_policy(elliptics::session::no_exceptions);
@@ -199,7 +204,7 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Similarity options");
 
-	std::string input_dir, pairs, index;
+	std::string input_dir, pairs, index, enc_dir;
 	std::string remote, group_string;
 	std::string log_file;
 	int log_level;
@@ -210,6 +215,7 @@ int main(int argc, char *argv[])
 		("input-dir", bpo::value<std::string>(&input_dir)->required(), "Input directory")
 		("pairs", bpo::value<std::string>(&pairs)->required(), "Pairs data file")
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
+		("encoding-dir", bpo::value<std::string>(&enc_dir), "Directory with charset statistics files")
 		("num", bpo::value<int>(&num)->default_value(2), "Number of pairs to read")
 
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
@@ -235,7 +241,7 @@ int main(int argc, char *argv[])
 
 	try {
 		loader el(remote, group_string, log_file, log_level);
-		el.load(index, input_dir, pairs, num);
+		el.load(index, enc_dir, input_dir, pairs, num);
 
 	} catch (const std::exception &e) {
 		std::cerr << "exception: " << e.what() << std::endl;
