@@ -1,4 +1,5 @@
 #include "dlib.hpp"
+#include "elliptics.hpp"
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
@@ -59,6 +60,14 @@ class loader {
 				m_cond.wait(guard);
 			}
 
+			const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
+
+			msgpack::unpacked msg;
+			msgpack::unpack(&msg, res.data<char>(), res.size());
+
+			msg.get().convert(&m_elements);
+			printf("loaded: documents: %zd, learn-elements: %zd\n", m_documents.size(), m_elements.size());
+
 			std::ifstream fin(train_file.c_str(), std::ios::binary);
 			dlib::deserialize(m_learned_pfunc, fin);
 		}
@@ -66,6 +75,7 @@ class loader {
 	private:
 		std::mutex m_lock;
 		std::vector<simdoc> m_documents;
+		std::vector<learn_element> m_elements;
 
 		std::mutex m_cond_lock;
 		std::condition_variable m_cond;
@@ -99,7 +109,8 @@ class loader {
 		}
 
 		void final_callback(const elliptics::error_info &error) {
-			printf("loaded: %zd docs, error: %d\n", m_documents.size(), error.code());
+			(void) error;
+
 			m_done = true;
 			m_cond.notify_one();
 		}

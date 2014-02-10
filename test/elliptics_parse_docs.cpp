@@ -1,3 +1,4 @@
+#include "elliptics.hpp"
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
@@ -87,7 +88,7 @@ class loader {
 			msgpack::sbuffer buffer;
 			msgpack::pack(&buffer, elements);
 
-			session.write_data(index + ".elements", elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0).wait();
+			session.write_data(elliptics_element_key(index), elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0).wait();
 
 			int cpunum = std::thread::hardware_concurrency();
 			if (cpunum == 0)
