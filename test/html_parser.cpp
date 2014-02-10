@@ -25,11 +25,10 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Document parser options");
 
-	std::string enc, enc_dir;
+	std::string enc_dir;
 	generic.add_options()
 		("help", "This help message")
 		("tokenize", "Tokenize text")
-		("encoding", bpo::value<std::string>(&enc), "File encoding")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		("ngrams", "Generate ngrams and their intersection")
 		;
@@ -70,7 +69,7 @@ int main(int argc, char *argv[])
 
 	for (auto f : files) {
 		try {
-			parser.feed(f.c_str(), enc);
+			parser.feed(f.c_str());
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;

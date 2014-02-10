@@ -99,7 +99,7 @@ class learner {
 
 				std::string file = m_input + lexical_cast(doc.id()) + ".html";
 				try {
-					parser.feed(file.c_str(), "");
+					parser.feed(file.c_str());
 					std::string text = parser.text();
 
 					parser.generate_ngrams(text, doc.ngrams());
@@ -251,29 +251,4 @@ int main(int argc, char *argv[])
 		learner l(input, learn_file, learn_output, encoding_dir);
 		return -1;
 	}
-#if 0
-	std::vector<document> docs;
-
-	for (auto f : files) {
-		try {
-			p.feed(argv[i], 4);
-			if (p.hashes().size() > 0)
-				docs.emplace_back(argv[i], p.hashes());
-
-#if 0
-			std::cout << "================================" << std::endl;
-			std::cout << argv[i] << ": hashes: " << p.hashes().size() << std::endl;
-			std::ostringstream ss;
-			std::vector<std::string> tokens = p.tokens();
-
-			std::copy(tokens.begin(), tokens.end(), std::ostream_iterator<std::string>(ss, " "));
-			std::cout << ss.str() << std::endl;
-#endif
-		} catch (const std::exception &e) {
-			std::cerr << argv[i] << ": caught exception: " << e.what() << std::endl;
-		}
-	}
-
-
-#endif
 }

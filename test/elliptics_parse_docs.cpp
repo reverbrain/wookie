@@ -121,7 +121,7 @@ class loader {
 				std::string doc_id_str = lexical_cast(doc.id);
 				std::string file = m_input_dir + doc_id_str + ".html";
 				try {
-					parser.feed(file.c_str(), "");
+					parser.feed(file.c_str());
 
 					doc.text = parser.text();
 					parser.generate_ngrams(doc.text, doc.ngrams);

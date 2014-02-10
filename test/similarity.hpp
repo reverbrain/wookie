@@ -105,7 +105,7 @@ class document_parser {
 			close(fd);
 		}
 
-		void feed(const char *path, const std::string &enc) {
+		void feed(const char *path) {
 			std::ifstream in(path);
 			if (in.bad())
 				return;
@@ -114,7 +114,7 @@ class document_parser {
 
 			ss << in.rdbuf();
 
-			m_parser.parse(ss.str(), enc);
+			m_parser.parse(ss.str());
 		}
 
 		std::string text(void) const {
