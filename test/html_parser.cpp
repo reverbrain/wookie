@@ -25,11 +25,10 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Document parser options");
 
-	std::string enc, enc_dir;
+	std::string enc_dir;
 	generic.add_options()
 		("help", "This help message")
 		("tokenize", "Tokenize text")
-		("encoding", bpo::value<std::string>(&enc), "File encoding")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		("ngrams", "Generate ngrams and their intersection")
 		;
@@ -70,7 +69,7 @@ int main(int argc, char *argv[])
 
 	for (auto f : files) {
 		try {
-			parser.feed(f.c_str(), enc);
+			parser.feed(f.c_str());
 
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
@@ -109,14 +108,9 @@ int main(int argc, char *argv[])
 			const std::vector<ngram> &f = fit->ngrams();
 			const std::vector<ngram> &s = sit->ngrams();
 
-			if (!f.size() || !s.size())
-				continue;
-
-			printf("ngrams intersect: ");
-			for (size_t i = 0; i < f.size(); ++i) {
-				ngram out = ngram::intersect(f[i], s[i]);
-				printf("%zd ", out.hashes.size());
-			}
+			printf("ngrams intersect: id: %d, size: %zd vs id: %d, size: %zd: ", fit->id(), f.size(), sit->id(), s.size());
+			auto tmp = intersect(f, s);
+			printf("intersection-size: %zd: %s", tmp.size(), tmp.size() * 100 / std::min(f.size(), s.size()) > 50 ? "MATCH" : "NO MATCH");
 			printf("\n");
 		}
 	}

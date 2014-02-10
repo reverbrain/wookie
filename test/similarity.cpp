@@ -99,7 +99,7 @@ class learner {
 
 				std::string file = m_input + lexical_cast(doc.id()) + ".html";
 				try {
-					parser.feed(file.c_str(), "");
+					parser.feed(file.c_str());
 					std::string text = parser.text();
 
 					parser.generate_ngrams(text, doc.ngrams());
@@ -134,16 +134,15 @@ class learner {
 			if (!f.size() || !s.size())
 				return false;
 
-			for (size_t i = 0; i < req_ngrams.size(); ++i) {
-				ngram out = ngram::intersect(f[i], s[i]);
-				le.features.push_back(out.hashes.size());
+			le.features.push_back(f.size());
+			le.features.push_back(s.size());
 
-				ngram req_out = ngram::intersect(req_ngrams[i], out);
-				le.features.push_back(req_out.hashes.size());
+			std::vector<ngram> inter = intersect(f, s);
+			le.features.push_back(inter.size());
 
-			}
+			le.features.push_back(req_ngrams.size());
+			le.features.push_back(intersect(inter, req_ngrams).size());
 
-			le.features.push_back(req_ngrams[0].hashes.size());
 			le.valid = true;
 			return true;
 		}
@@ -251,29 +250,4 @@ int main(int argc, char *argv[])
 		learner l(input, learn_file, learn_output, encoding_dir);
 		return -1;
 	}
-#if 0
-	std::vector<document> docs;
-
-	for (auto f : files) {
-		try {
-			p.feed(argv[i], 4);
-			if (p.hashes().size() > 0)
-				docs.emplace_back(argv[i], p.hashes());
-
-#if 0
-			std::cout << "================================" << std::endl;
-			std::cout << argv[i] << ": hashes: " << p.hashes().size() << std::endl;
-			std::ostringstream ss;
-			std::vector<std::string> tokens = p.tokens();
-
-			std::copy(tokens.begin(), tokens.end(), std::ostream_iterator<std::string>(ss, " "));
-			std::cout << ss.str() << std::endl;
-#endif
-		} catch (const std::exception &e) {
-			std::cerr << argv[i] << ": caught exception: " << e.what() << std::endl;
-		}
-	}
-
-
-#endif
 }

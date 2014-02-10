@@ -77,7 +77,7 @@ struct rindex_processor
 		parser p;
 		// fallback is a processor which handles replies which are forbidden by filters
 		if (!fallback)
-			p.parse(data, "");
+			p.parse(data);
 
 		try {
 			process(reply.url().to_string(), p.text(" "), ts, base + ".collection");

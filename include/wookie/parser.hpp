@@ -41,7 +41,7 @@ class parser {
 		~parser() {
 		}
 
-		void parse(const std::string &page, const std::string &encoding) {
+		void parse(const std::string &page) {
 			reset();
 
 			if (page.size() == 0)
@@ -52,7 +52,7 @@ class parser {
 
 			tidyBufInit(&errbuf);
 
-			tidySetCharEncoding(tdoc, encoding.size() ? encoding.c_str() : "raw");
+			tidySetCharEncoding(tdoc, "raw");
 			tidyOptSetBool(tdoc, TidyXhtmlOut, yes);
 			tidySetErrorBuffer(tdoc, &errbuf);
 
