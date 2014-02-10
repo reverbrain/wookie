@@ -79,6 +79,7 @@ class loader {
 					msg.get().convert(&doc);
 
 					std::unique_lock<std::mutex> guard(m_lock);
+					//printf("id: %d, text-size: %zd, ngram-size: %zd\n", doc.id, doc.text.size(), doc.ngrams.size());
 					m_documents.emplace_back(doc);
 				} catch (const std::exception &e) {
 					fprintf(stderr, "exception: id: %s, object-size: %zd, error: %s\n",
