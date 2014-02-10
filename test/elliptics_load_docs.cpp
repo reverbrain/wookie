@@ -15,6 +15,7 @@ using namespace ioremap::similarity;
 class loader {
 	public:
 		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level) :
+		m_done(false),
 		m_logger(log.c_str(), level),
 		m_node(m_logger) {
 			m_node.add_remote(remote.c_str());
@@ -52,8 +53,10 @@ class loader {
 			session.bulk_read(keys).connect(std::bind(&loader::result_callback, this, std::placeholders::_1),
 					std::bind(&loader::final_callback, this, std::placeholders::_1));
 
-			std::unique_lock<std::mutex> guard(m_cond_lock);
-			m_cond.wait(guard);
+			while (!m_done) {
+				std::unique_lock<std::mutex> guard(m_cond_lock);
+				m_cond.wait(guard);
+			}
 		}
 
 	private:
@@ -62,6 +65,7 @@ class loader {
 
 		std::mutex m_cond_lock;
 		std::condition_variable m_cond;
+		bool m_done;
 
 		elliptics::file_logger m_logger;
 		elliptics::node m_node;
@@ -90,6 +94,7 @@ class loader {
 
 		void final_callback(const elliptics::error_info &error) {
 			printf("loaded: %zd docs, error: %d\n", m_documents.size(), error.code());
+			m_done = true;
 			m_cond.notify_one();
 		}
 };
