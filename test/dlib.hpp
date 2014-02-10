@@ -12,6 +12,12 @@ namespace ioremap { namespace similarity {
 
 class dlib_learner {
 	public:
+		typedef dlib::matrix<double, 0, 1> sample_type;
+		typedef dlib::radial_basis_kernel<sample_type> kernel_type;
+
+		typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
+		typedef dlib::normalized_function<prob_dec_funct_type> pfunct_type;
+
 		dlib_learner() {}
 
 		void add_sample(const learn_element &le, int label) {
@@ -40,8 +46,6 @@ class dlib_learner {
 			trainer.be_verbose();
 			trainer.use_classification_loss_for_loo_cv();
 
-			typedef dlib::probabilistic_decision_function<kernel_type> prob_dec_funct_type;
-			typedef dlib::normalized_function<prob_dec_funct_type> pfunct_type;
 
 			dlib::randomize_samples(m_samples, m_labels);
 
@@ -100,9 +104,6 @@ class dlib_learner {
 		}
 
 	private:
-		typedef dlib::matrix<double, 0, 1> sample_type;
-		typedef dlib::radial_basis_kernel<sample_type> kernel_type;
-
 		std::vector<sample_type> m_samples;
 		std::vector<double> m_labels;
 };

@@ -199,6 +199,8 @@ struct learn_element {
 	bool valid;
 
 	std::vector<int> features;
+
+	MSGPACK_DEFINE(doc_ids, request);
 };
 
 }} // namespace ioremap::similarity
