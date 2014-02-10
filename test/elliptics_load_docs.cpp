@@ -1,3 +1,5 @@
+#include "dlib.hpp"
+#include "elliptics.hpp"
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
@@ -15,6 +17,7 @@ using namespace ioremap::similarity;
 class loader {
 	public:
 		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level) :
+		m_done(false),
 		m_logger(log.c_str(), level),
 		m_node(m_logger) {
 			m_node.add_remote(remote.c_str());
@@ -52,20 +55,37 @@ class loader {
 			session.bulk_read(keys).connect(std::bind(&loader::result_callback, this, std::placeholders::_1),
 					std::bind(&loader::final_callback, this, std::placeholders::_1));
 
-			std::unique_lock<std::mutex> guard(m_cond_lock);
-			m_cond.wait(guard);
+			while (!m_done) {
+				std::unique_lock<std::mutex> guard(m_cond_lock);
+				m_cond.wait(guard);
+			}
+
+			const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
+
+			msgpack::unpacked msg;
+			msgpack::unpack(&msg, res.data<char>(), res.size());
+
+			msg.get().convert(&m_elements);
+			printf("loaded: documents: %zd, learn-elements: %zd\n", m_documents.size(), m_elements.size());
+
+			std::ifstream fin(train_file.c_str(), std::ios::binary);
+			dlib::deserialize(m_learned_pfunc, fin);
 		}
 
 	private:
 		std::mutex m_lock;
 		std::vector<simdoc> m_documents;
+		std::vector<learn_element> m_elements;
 
 		std::mutex m_cond_lock;
 		std::condition_variable m_cond;
+		bool m_done;
 
 		elliptics::file_logger m_logger;
 		elliptics::node m_node;
 		std::vector<int> m_groups;
+
+		dlib_learner::pfunct_type m_learned_pfunc;
 
 		void result_callback(const elliptics::read_result_entry &result) {
 			if (result.size()) {
@@ -89,7 +109,9 @@ class loader {
 		}
 
 		void final_callback(const elliptics::error_info &error) {
-			printf("loaded: %zd docs, error: %d\n", m_documents.size(), error.code());
+			(void) error;
+
+			m_done = true;
 			m_cond.notify_one();
 		}
 };

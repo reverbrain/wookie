@@ -1,3 +1,4 @@
+#include "elliptics.hpp"
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
@@ -40,6 +41,8 @@ class loader {
 
 			std::set<int> ids;
 
+			std::vector<learn_element> elements;
+
 			std::string line;
 			int line_num = 0;
 			while ((line_num < max_line_num) && std::getline(in, line)) {
@@ -71,10 +74,21 @@ class loader {
 
 					ids.insert(doc[0]);
 					ids.insert(doc[1]);
+
+					elements.emplace_back(le);
 				}
 			}
 
 			m_doc_ids.assign(ids.begin(), ids.end());
+
+			elliptics::session session(m_node);
+			session.set_groups(m_groups);
+			session.set_ioflags(DNET_IO_FLAGS_CACHE);
+
+			msgpack::sbuffer buffer;
+			msgpack::pack(&buffer, elements);
+
+			session.write_data(elliptics_element_key(index), elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0).wait();
 
 			int cpunum = std::thread::hardware_concurrency();
 			if (cpunum == 0)
