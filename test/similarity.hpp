@@ -32,43 +32,28 @@
 
 namespace ioremap { namespace similarity {
 
-struct ngram {
-	ngram(int n, std::vector<long> &h) : n(n) {
-		hashes.swap(h);
-	}
+typedef long ngram;
 
-	ngram() : n(0) {}
-	ngram(int n) : n(n) {}
-	ngram(const ngram &src) {
-		n = src.n;
-		hashes = src.hashes;
-	}
+#define NGRAM_NUM	4
+#if NGRAM_NUM > 8 / 2
+#error "NGRAM_NUM doesn't fit long with 2-byte charset"
+#endif
 
-	ngram(ngram &&src) {
-		n = src.n;
-		hashes.swap(src.hashes);
-	}
+static inline std::vector<ngram> intersect(const std::vector<ngram> &f, const std::vector<ngram> &s)
+{
+	std::vector<ngram> tmp;
 
-	int n;
-	std::vector<long> hashes;
-
-	static ngram intersect(const ngram &f, const ngram &s) {
-		ngram tmp(f.n);
-		tmp.hashes.resize(f.hashes.size());
-
-		auto inter = std::set_intersection(f.hashes.begin(), f.hashes.end(),
-				s.hashes.begin(), s.hashes.end(), tmp.hashes.begin());
-		tmp.hashes.resize(inter - tmp.hashes.begin());
-
+	if (!f.size() || !s.size())
 		return tmp;
-	}
 
-	MSGPACK_DEFINE(n, hashes);
-};
+	tmp.resize(std::min(f.size(), s.size()));
+	auto inter = std::set_intersection(f.begin(), f.end(), s.begin(), s.end(), tmp.begin());
+	tmp.resize(inter - tmp.begin());
 
-#define NGRAM_START	1
-#define NGRAM_NUM	3
+	return tmp;
+}
 
+namespace lb = boost::locale::boundary;
 
 class document_parser {
 	public:
@@ -136,13 +121,7 @@ class document_parser {
 		}
 
 		void generate_ngrams(const std::string &text, std::vector<ngram> &ngrams) {
-			for (int i = NGRAM_START; i <= NGRAM_START + NGRAM_NUM; ++i) {
-				std::vector<long> hashes;
-
-				generate(text, i, hashes);
-
-				ngrams.emplace_back(i, hashes);
-			}
+			generate(text, ngrams);
 		}
 
 
@@ -152,24 +131,35 @@ class document_parser {
 		boost::locale::generator m_gen;
 		std::locale m_loc;
 
-		void generate(const std::string &text, int ngram_num, std::vector<long> &hashes) {
-			namespace lb = boost::locale::boundary;
+		void generate(const std::string &text, std::vector<ngram> &hashes) {
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
 			wmap.rule(lb::word_any);
 
-			std::list<std::string> ngram;
+			std::ostringstream tokens;
 
 			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
 				std::string token = boost::locale::to_lower(it->str(), m_loc);
+				tokens << token;
+			}
 
-				ngram.push_back(token);
+			std::string tstr = tokens.str();
+			lb::ssegment_index cmap(lb::character, tstr.begin(), tstr.end(), m_loc);
+			cmap.rule(lb::character_any);
 
-				if ((int)ngram.size() == ngram_num) {
+			std::list<std::string> ng;
+			for (auto it = cmap.begin(), end = cmap.end(); it != end; ++it) {
+				ng.push_back(*it);
+
+				if (ng.size() == NGRAM_NUM) {
 					std::ostringstream ss;
-					std::copy(ngram.begin(), ngram.end(), std::ostream_iterator<std::string>(ss, ""));
+					std::copy(ng.begin(), ng.end(), std::ostream_iterator<std::string>(ss, ""));
 
-					hashes.emplace_back(wookie::hash::murmur(ss.str(), 0));
-					ngram.pop_front();
+					std::string txt = ss.str();
+					ngram tmp_ngram = 0;
+					memcpy(&tmp_ngram, txt.data(), std::min(sizeof(ngram), txt.size()));
+
+					hashes.push_back(tmp_ngram);
+					ng.pop_front();
 				}
 			}
 

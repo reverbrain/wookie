@@ -108,14 +108,9 @@ int main(int argc, char *argv[])
 			const std::vector<ngram> &f = fit->ngrams();
 			const std::vector<ngram> &s = sit->ngrams();
 
-			if (!f.size() || !s.size())
-				continue;
-
-			printf("ngrams intersect: ");
-			for (size_t i = 0; i < f.size(); ++i) {
-				ngram out = ngram::intersect(f[i], s[i]);
-				printf("%zd ", out.hashes.size());
-			}
+			printf("ngrams intersect: id: %d, size: %zd vs id: %d, size: %zd: ", fit->id(), f.size(), sit->id(), s.size());
+			auto tmp = intersect(f, s);
+			printf("intersection-size: %zd: %s", tmp.size(), tmp.size() * 100 / std::min(f.size(), s.size()) > 50 ? "MATCH" : "NO MATCH");
 			printf("\n");
 		}
 	}

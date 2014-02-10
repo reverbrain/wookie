@@ -134,16 +134,15 @@ class learner {
 			if (!f.size() || !s.size())
 				return false;
 
-			for (size_t i = 0; i < req_ngrams.size(); ++i) {
-				ngram out = ngram::intersect(f[i], s[i]);
-				le.features.push_back(out.hashes.size());
+			le.features.push_back(f.size());
+			le.features.push_back(s.size());
 
-				ngram req_out = ngram::intersect(req_ngrams[i], out);
-				le.features.push_back(req_out.hashes.size());
+			std::vector<ngram> inter = intersect(f, s);
+			le.features.push_back(inter.size());
 
-			}
+			le.features.push_back(req_ngrams.size());
+			le.features.push_back(intersect(inter, req_ngrams).size());
 
-			le.features.push_back(req_ngrams[0].hashes.size());
 			le.valid = true;
 			return true;
 		}
