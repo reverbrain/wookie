@@ -1,3 +1,4 @@
+#include "dlib.hpp"
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
@@ -57,6 +58,9 @@ class loader {
 				std::unique_lock<std::mutex> guard(m_cond_lock);
 				m_cond.wait(guard);
 			}
+
+			std::ifstream fin(train_file.c_str(), std::ios::binary);
+			dlib::deserialize(m_learned_pfunc, fin);
 		}
 
 	private:
@@ -70,6 +74,8 @@ class loader {
 		elliptics::file_logger m_logger;
 		elliptics::node m_node;
 		std::vector<int> m_groups;
+
+		dlib_learner::pfunct_type m_learned_pfunc;
 
 		void result_callback(const elliptics::read_result_entry &result) {
 			if (result.size()) {
