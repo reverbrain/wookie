@@ -23,7 +23,7 @@
 
 namespace ioremap { namespace wookie { namespace hash {
 
-static long murmur(const std::string &str, long seed)
+static inline long murmur(const std::string &str, long seed)
 {
 	const uint64_t m = 0xc6a4a7935bd1e995LLU;
 	const int r = 47;
