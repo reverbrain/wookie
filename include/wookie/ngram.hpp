@@ -33,9 +33,9 @@ struct ncount {
 	int		count;
 };
 
-class ngram {
+class byte_ngram {
 	public:
-		ngram(int n) : m_n(n) {}
+		byte_ngram(int n) : m_n(n) {}
 
 		static std::vector<std::string> split(const std::string &text, size_t ngram) {
 			std::vector<std::string> ret;
@@ -51,7 +51,7 @@ class ngram {
 		}
 
 		void load(const std::string &text) {
-			std::vector<std::string> grams = ngram::split(text, m_n);
+			std::vector<std::string> grams = byte_ngram::split(text, m_n);
 			for (auto word = grams.begin(); word != grams.end(); ++word) {
 				auto it = m_map.find(*word);
 				if (it == m_map.end())
@@ -135,7 +135,7 @@ class probability {
 		}
 
 	private:
-		ngram m_n2, m_n3;
+		byte_ngram m_n2, m_n3;
 };
 
 class detector {
