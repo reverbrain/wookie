@@ -87,35 +87,34 @@ class loader {
 				size_t lepos = rand() % m_elements.size();
 				learn_element & le = m_elements[lepos];
 
-				if ((le.doc_ids[0] >= (int)m_id_position.size()) || (le.doc_ids[0] >= (int)m_id_position.size())) {
-					fprintf(stderr, "Malformed learn element: pos: %zd, documents: %d,%d, position-array-size: %zd\n", lepos, le.doc_ids[0], le.doc_ids[1], m_id_position.size());
-					continue;
-				}
+				try {
+					int pos1 = m_id_position[le.doc_ids[0]];
+					int pos2 = m_id_position[le.doc_ids[1]];
 
-				int pos1 = m_id_position[le.doc_ids[0]];
-				int pos2 = m_id_position[le.doc_ids[1]];
+					const simdoc &d1 = m_documents[pos1];
+					const simdoc &d2 = m_documents[pos2];
 
-				const simdoc &d1 = m_documents[pos1];
-				const simdoc &d2 = m_documents[pos2];
+					le.generate_features(d1, d2);
 
-				le.generate_features(d1, d2);
+					dlib_learner::sample_type s;
+					s.set_size(le.features.size());
 
-				dlib_learner::sample_type s;
-				s.set_size(le.features.size());
+					for (size_t j = 0; j < le.features.size(); ++j)
+						s(j) = le.features[j];
 
-				for (size_t j = 0; j < le.features.size(); ++j)
-					s(j) = le.features[j];
+					++total;
 
-				++total;
-
-				auto l = m_learned_pfunc(s);
-				if (l >= 0.5) {
-					++success;
-				} else {
-					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
-					for (size_t k = 0; k < le.features.size(); ++k)
-						printf("%d ", le.features[k]);
-					printf(": %f\n", l);
+					auto l = m_learned_pfunc(s);
+					if (l >= 0.5) {
+						++success;
+					} else {
+						printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
+						for (size_t k = 0; k < le.features.size(); ++k)
+							printf("%d ", le.features[k]);
+						printf(": %f\n", l);
+					}
+				} catch (const std::exception &e) {
+					fprintf(stderr, "learn element check failed: pos: %zd, documents: %d,%d, error: %s\n", lepos, le.doc_ids[0], le.doc_ids[1], e.what());
 				}
 			}
 		}
