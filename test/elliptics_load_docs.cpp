@@ -32,9 +32,11 @@ class loader {
 			boost::split(gr, group_string, boost::is_any_of(":"));
 
 			std::transform(gr.begin(), gr.end(), std::back_inserter<std::vector<int>>(m_groups), digitizer());
+
+			srand(time(NULL));
 		}
 
-		void load(const std::string &index, const std::string &train_file) {
+		void load(const std::string &index, const std::string &train_file, int num) {
 			std::vector<std::string> vindexes;
 			vindexes.push_back(index);
 
@@ -42,6 +44,7 @@ class loader {
 			session.set_groups(m_groups);
 			session.set_exceptions_policy(elliptics::session::no_exceptions);
 			session.set_ioflags(DNET_IO_FLAGS_CACHE);
+			session.set_timeout(600);
 
 			std::vector<elliptics::key> keys;
 
@@ -60,6 +63,11 @@ class loader {
 				m_cond.wait(guard);
 			}
 
+			for (size_t i = 0; i < m_documents.size(); ++i) {
+				const simdoc & doc = m_documents[i];
+				m_id_position[doc.id] = i;
+			}
+
 			const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
 
 			msgpack::unpacked msg;
@@ -71,7 +79,44 @@ class loader {
 			std::ifstream fin(train_file.c_str(), std::ios::binary);
 			dlib::deserialize(m_learned_pfunc, fin);
 
-			for (int i = 0; i < 125; ++i) {
+			size_t total = 0;
+			size_t success = 0;
+
+			num = std::min<int>(num, m_elements.size());
+			for (int i = 0; i < num; ++i) {
+				size_t lepos = rand() % m_elements.size();
+				learn_element & le = m_elements[lepos];
+
+				if ((le.doc_ids[0] >= (int)m_id_position.size()) || (le.doc_ids[0] >= (int)m_id_position.size())) {
+					fprintf(stderr, "Malformed learn element: pos: %zd, documents: %d,%d, position-array-size: %zd\n", lepos, le.doc_ids[0], le.doc_ids[1], m_id_position.size());
+					continue;
+				}
+
+				int pos1 = m_id_position[le.doc_ids[0]];
+				int pos2 = m_id_position[le.doc_ids[1]];
+
+				const simdoc &d1 = m_documents[pos1];
+				const simdoc &d2 = m_documents[pos2];
+
+				le.generate_features(d1, d2);
+
+				dlib_learner::sample_type s;
+				s.set_size(le.features.size());
+
+				for (size_t j = 0; j < le.features.size(); ++j)
+					s(j) = le.features[j];
+
+				++total;
+
+				auto l = m_learned_pfunc(s);
+				if (l >= 0.5) {
+					++success;
+				} else {
+					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
+					for (size_t k = 0; k < le.features.size(); ++k)
+						printf("%d ", le.features[k]);
+					printf(": %f\n", l);
+				}
 			}
 		}
 
@@ -79,6 +124,7 @@ class loader {
 		std::mutex m_lock;
 		std::vector<simdoc> m_documents;
 		std::vector<learn_element> m_elements;
+		std::map<int, int> m_id_position;
 
 		std::mutex m_cond_lock;
 		std::condition_variable m_cond;
@@ -130,11 +176,13 @@ int main(int argc, char *argv[])
 	std::string remote, group_string;
 	std::string log_file;
 	int log_level;
+	int num;
 
 	generic.add_options()
 		("help", "This help message")
 		("model-file", bpo::value<std::string>(&train_file)->required(), "ML model file")
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
+		("num", bpo::value<int>(&num)->default_value(125), "Number of test samples randomly picked from the list of learn elements")
 
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
 		("groups", bpo::value<std::string>(&group_string)->required(), "Colon seaprated list of groups")
@@ -159,7 +207,7 @@ int main(int argc, char *argv[])
 
 	try {
 		loader el(remote, group_string, log_file, log_level);
-		el.load(index, train_file);
+		el.load(index, train_file, num);
 
 	} catch (const std::exception &e) {
 		std::cerr << "exception: " << e.what() << std::endl;
