@@ -117,6 +117,8 @@ class loader {
 					fprintf(stderr, "learn element check failed: pos: %zd, documents: %d,%d, error: %s\n", lepos, le.doc_ids[0], le.doc_ids[1], e.what());
 				}
 			}
+
+			printf("success rate: %zd%%", success * 100 / num);
 		}
 
 	private:
