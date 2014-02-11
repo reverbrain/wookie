@@ -1,6 +1,8 @@
 #ifndef __WOOKIE_SIMILARITY_HPP
 #define __WOOKIE_SIMILARITY_HPP
 
+#include "simdoc.hpp"
+
 #include "wookie/iconv.hpp"
 #include "wookie/hash.hpp"
 #include "wookie/lexical_cast.hpp"
@@ -31,13 +33,6 @@
 #include <string.h>
 
 namespace ioremap { namespace similarity {
-
-typedef long ngram;
-
-#define NGRAM_NUM	4
-#if NGRAM_NUM > 8 / 2
-#error "NGRAM_NUM doesn't fit long with 2-byte charset"
-#endif
 
 static inline std::vector<ngram> intersect(const std::vector<ngram> &f, const std::vector<ngram> &s)
 {
@@ -168,28 +163,6 @@ class document_parser {
 		}
 };
 
-class document {
-	public:
-		document(int doc_id) : m_doc_id(doc_id) {
-		}
-
-		std::vector<ngram> &ngrams(void) {
-			return m_ngrams;
-		}
-
-		const std::vector<ngram> &ngrams(void) const {
-			return m_ngrams;
-		}
-
-		int id(void) const {
-			return m_doc_id;
-		}
-
-	private:
-		int m_doc_id;
-		std::vector<ngram> m_ngrams;
-};
-
 struct learn_element {
 	learn_element() : valid(false) {
 	}
@@ -203,6 +176,26 @@ struct learn_element {
 	std::vector<int> features;
 
 	MSGPACK_DEFINE(doc_ids, request, req_ngrams);
+
+	bool generate_features(const simdoc &d1, const simdoc &d2) {
+		const std::vector<ngram> &f = d1.ngrams;
+		const std::vector<ngram> &s = d2.ngrams;
+
+		if (!f.size() || !s.size())
+			return false;
+
+		features.push_back(f.size());
+		features.push_back(s.size());
+
+		std::vector<ngram> inter = intersect(f, s);
+		features.push_back(inter.size());
+
+		features.push_back(req_ngrams.size());
+		features.push_back(intersect(inter, req_ngrams).size());
+
+		valid = true;
+		return true;
+	}
 };
 
 }} // namespace ioremap::similarity
