@@ -86,39 +86,44 @@ class loader {
 			for (int i = 0; i < num; ++i) {
 				size_t lepos = rand() % m_elements.size();
 				learn_element & le = m_elements[lepos];
+				learn_element negative;
 
-				try {
-					int pos1 = m_id_position[le.doc_ids[0]];
-					int pos2 = m_id_position[le.doc_ids[1]];
+				if (!make_element(le, negative))
+					continue;
 
-					const simdoc &d1 = m_documents[pos1];
-					const simdoc &d2 = m_documents[pos2];
+				dlib_learner::sample_type s, n;
+				s.set_size(le.features.size());
+				n.set_size(negative.features.size());
 
-					le.generate_features(d1, d2);
+				for (size_t j = 0; j < le.features.size(); ++j)
+					s(j) = le.features[j];
+				for (size_t j = 0; j < negative.features.size(); ++j)
+					n(j) = negative.features[j];
 
-					dlib_learner::sample_type s;
-					s.set_size(le.features.size());
+				total += 2;
 
-					for (size_t j = 0; j < le.features.size(); ++j)
-						s(j) = le.features[j];
+				auto l = m_learned_pfunc(s);
+				if (l >= 0.5) {
+					++success;
+				} else {
+					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
+					for (size_t k = 0; k < le.features.size(); ++k)
+						printf("%d ", le.features[k]);
+					printf(": %f\n", l);
+				}
 
-					++total;
-
-					auto l = m_learned_pfunc(s);
-					if (l >= 0.5) {
-						++success;
-					} else {
-						printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
-						for (size_t k = 0; k < le.features.size(); ++k)
-							printf("%d ", le.features[k]);
-						printf(": %f\n", l);
-					}
-				} catch (const std::exception &e) {
-					fprintf(stderr, "learn element check failed: pos: %zd, documents: %d,%d, error: %s\n", lepos, le.doc_ids[0], le.doc_ids[1], e.what());
+				l = m_learned_pfunc(n);
+				if (l < 0.5) {
+					++success;
+				} else {
+					printf("negative documents: %d,%d, req: '%s', features: ", negative.doc_ids[0], negative.doc_ids[1], negative.request.c_str());
+					for (size_t k = 0; k < negative.features.size(); ++k)
+						printf("%d ", negative.features[k]);
+					printf(": %f\n", l);
 				}
 			}
 
-			printf("success rate: %zd%%\n", success * 100 / num);
+			printf("elements-processed: %zd, success rate: %zd%%\n", success * 100 / total, total);
 		}
 
 	private:
@@ -136,6 +141,47 @@ class loader {
 		std::vector<int> m_groups;
 
 		dlib_learner::pfunct_type m_learned_pfunc;
+
+		bool make_element(learn_element &le, learn_element &negative) {
+			try {
+				int pos1 = m_id_position[le.doc_ids[0]];
+				int pos2 = m_id_position[le.doc_ids[1]];
+
+				const simdoc &d1 = m_documents[pos1];
+				const simdoc &d2 = m_documents[pos2];
+
+				if (!le.generate_features(d1, d2))
+					return false;
+
+				generate_negative_element(le, negative);
+				return true;
+			} catch (const std::exception &e) {
+				fprintf(stderr, "learn element check failed: documents: %d,%d, error: %s\n", le.doc_ids[0], le.doc_ids[1], e.what());
+				return false;
+			}
+		}
+
+		void generate_negative_element(learn_element &le, learn_element &negative) {
+			int doc_id = le.doc_ids[0];
+
+			negative.doc_ids.push_back(doc_id);
+
+			negative.request = le.request;
+			negative.req_ngrams = le.req_ngrams;
+
+			while (1) {
+				int pos = rand() % m_documents.size();
+				const simdoc &next = m_documents[pos];
+
+				if ((pos == doc_id) || !next.ngrams.size() || (pos == le.doc_ids[1]))
+					continue;
+
+				negative.doc_ids.push_back(pos);
+				break;
+			}
+
+			negative.generate_features(m_documents[negative.doc_ids[0]], m_documents[negative.doc_ids[1]]);
+		}
 
 		void result_callback(const elliptics::read_result_entry &result) {
 			if (result.size()) {
