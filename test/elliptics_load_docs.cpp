@@ -118,7 +118,7 @@ class loader {
 				}
 			}
 
-			printf("success rate: %zd%%", success * 100 / num);
+			printf("success rate: %zd%%\n", success * 100 / num);
 		}
 
 	private:
