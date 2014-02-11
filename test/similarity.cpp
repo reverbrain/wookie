@@ -193,7 +193,7 @@ class learner {
 
 			const simdoc &d1 = m_documents[pos1];
 			const simdoc &d2 = m_documents[pos2];
-			negative.generate_features(m_documents[negative.doc_ids[0]], m_documents[negative.doc_ids[1]]);
+			negative.generate_features(d1, d2);
 		}
 };
 
