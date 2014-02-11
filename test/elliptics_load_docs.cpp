@@ -66,10 +66,13 @@ class loader {
 			msgpack::unpack(&msg, res.data<char>(), res.size());
 
 			msg.get().convert(&m_elements);
-			printf("loaded: documents: %zd, learn-elements: %zd\n", m_documents.size(), m_elements.size());
+			printf("loaded: keys: %zd, documents: %zd, learn-elements: %zd\n", keys.size(), m_documents.size(), m_elements.size());
 
 			std::ifstream fin(train_file.c_str(), std::ios::binary);
 			dlib::deserialize(m_learned_pfunc, fin);
+
+			for (int i = 0; i < 125; ++i) {
+			}
 		}
 
 	private:

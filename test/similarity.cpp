@@ -52,7 +52,10 @@ class learner {
 
 			m_documents.reserve(ids.size());
 			for (auto id : ids) {
-				m_documents.emplace_back(document(id));
+				simdoc tmp;
+				tmp.id = id;
+
+				m_documents.emplace_back(tmp);
 
 				m_id_position[id] = m_documents.size() - 1;
 			}
@@ -77,7 +80,7 @@ class learner {
 
 	private:
 		std::string m_input;
-		std::vector<document> m_documents;
+		std::vector<simdoc> m_documents;
 		std::string m_enc_dir;
 
 		std::map<int, int> m_id_position;
@@ -95,14 +98,14 @@ class learner {
 			parser.load_encodings(m_enc_dir);
 
 			for (size_t i = dth.id; i < m_documents.size(); i += dth.step) {
-				document & doc = m_documents[i];
+				simdoc & doc = m_documents[i];
 
-				std::string file = m_input + lexical_cast(doc.id()) + ".html";
+				std::string file = m_input + lexical_cast(doc.id) + ".html";
 				try {
 					parser.feed(file.c_str());
 					std::string text = parser.text();
 
-					parser.generate_ngrams(text, doc.ngrams());
+					parser.generate_ngrams(text, doc.ngrams);
 				} catch (const std::exception &e) {
 					std::cerr << file << ": caught exception: " << e.what() << std::endl;
 				}
@@ -116,34 +119,16 @@ class learner {
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
 
-				parser.generate_ngrams(le.request, le.req_ngrams);
+				int pos1 = m_id_position[le.doc_ids[0]];
+				int pos2 = m_id_position[le.doc_ids[1]];
 
-				if (generate_features(le))
+				parser.generate_ngrams(le.request, le.req_ngrams);
+				const simdoc &d1 = m_documents[pos1];
+				const simdoc &d2 = m_documents[pos2];
+
+				if (le.generate_features(d1, d2))
 					generate_negative_element(le, m_negative_elements[i]);
 			}
-		}
-
-		bool generate_features(learn_element &le) {
-			int pos1 = m_id_position[le.doc_ids[0]];
-			int pos2 = m_id_position[le.doc_ids[1]];
-
-			const std::vector<ngram> &f = m_documents[pos1].ngrams();
-			const std::vector<ngram> &s = m_documents[pos2].ngrams();
-
-			if (!f.size() || !s.size())
-				return false;
-
-			le.features.push_back(f.size());
-			le.features.push_back(s.size());
-
-			std::vector<ngram> inter = intersect(f, s);
-			le.features.push_back(inter.size());
-
-			le.features.push_back(le.req_ngrams.size());
-			le.features.push_back(intersect(inter, le.req_ngrams).size());
-
-			le.valid = true;
-			return true;
 		}
 
 		void add_documents(int cpunum) {
@@ -196,16 +181,16 @@ class learner {
 
 			while (1) {
 				int pos = rand() % m_documents.size();
-				const document &next = m_documents[pos];
+				const simdoc &next = m_documents[pos];
 
-				if ((pos == doc_id) || !next.ngrams().size() || (pos == le.doc_ids[1]))
+				if ((pos == doc_id) || !next.ngrams.size() || (pos == le.doc_ids[1]))
 					continue;
 
 				negative.doc_ids.push_back(pos);
 				break;
 			}
 
-			generate_features(negative);
+			negative.generate_features(m_documents[negative.doc_ids[0]], m_documents[negative.doc_ids[1]]);
 		}
 };
 

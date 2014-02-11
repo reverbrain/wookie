@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 	if (enc_dir.size())
 		parser.load_encodings(enc_dir);
 
-	std::vector<document> documents;
+	std::vector<simdoc> documents;
 
 	for (auto f : files) {
 		try {
@@ -94,8 +94,8 @@ int main(int argc, char *argv[])
 			}
 
 			if (vm.count("ngrams")) {
-				document doc(0);
-				parser.generate_ngrams(text, doc.ngrams());
+				simdoc doc;
+				parser.generate_ngrams(text, doc.ngrams);
 				documents.emplace_back(doc);
 			}
 		} catch (const std::exception &e) {
@@ -105,10 +105,10 @@ int main(int argc, char *argv[])
 
 	if (documents.size() >= 2) {
 		for (auto fit = documents.begin(), sit = fit + 1; sit != documents.end(); ++fit, ++sit) {
-			const std::vector<ngram> &f = fit->ngrams();
-			const std::vector<ngram> &s = sit->ngrams();
+			const std::vector<ngram> &f = fit->ngrams;
+			const std::vector<ngram> &s = sit->ngrams;
 
-			printf("ngrams intersect: id: %d, size: %zd vs id: %d, size: %zd: ", fit->id(), f.size(), sit->id(), s.size());
+			printf("ngrams intersect: size: %zd vs %zd: ", f.size(), s.size());
 			auto tmp = intersect(f, s);
 			printf("intersection-size: %zd: %s", tmp.size(), tmp.size() * 100 / std::min(f.size(), s.size()) > 50 ? "MATCH" : "NO MATCH");
 			printf("\n");

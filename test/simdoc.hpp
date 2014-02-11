@@ -11,6 +11,13 @@
 
 namespace ioremap { namespace similarity {
 
+typedef long ngram;
+
+#define NGRAM_NUM	4
+#if NGRAM_NUM > 8 / 2
+#error "NGRAM_NUM doesn't fit long with 2-byte charset"
+#endif
+
 struct simdoc {
 	enum {
 		version = 1,
@@ -19,6 +26,8 @@ struct simdoc {
 	int id;
 	std::string text;
 	std::vector<ngram> ngrams;
+
+	simdoc() : id(0) {}
 };
 
 }} // namespace ioremap::similarity
