@@ -162,9 +162,7 @@ class loader {
 		}
 
 		void generate_negative_element(learn_element &le, learn_element &negative) {
-			int doc_id = le.doc_ids[0];
-
-			negative.doc_ids.push_back(doc_id);
+			negative.doc_ids.push_back(le.doc_ids[0]);
 
 			negative.request = le.request;
 			negative.req_ngrams = le.req_ngrams;
@@ -173,14 +171,20 @@ class loader {
 				int pos = rand() % m_documents.size();
 				const simdoc &next = m_documents[pos];
 
-				if ((pos == doc_id) || !next.ngrams.size() || (pos == le.doc_ids[1]))
+				if ((next.id == le.doc_ids[0]) || !next.ngrams.size() || (next.id == le.doc_ids[1]))
 					continue;
 
-				negative.doc_ids.push_back(pos);
+				negative.doc_ids.push_back(next.id);
 				break;
 			}
 
-			negative.generate_features(m_documents[negative.doc_ids[0]], m_documents[negative.doc_ids[1]]);
+			int pos1 = m_id_position[negative.doc_ids[0]];
+			int pos2 = m_id_position[negative.doc_ids[1]];
+
+			const simdoc &d1 = m_documents[pos1];
+			const simdoc &d2 = m_documents[pos2];
+
+			negative.generate_features(d1, d2);
 		}
 
 		void result_callback(const elliptics::read_result_entry &result) {
