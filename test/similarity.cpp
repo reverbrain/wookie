@@ -116,15 +116,14 @@ class learner {
 			for (size_t i = dth.id; i < m_elements.size(); i += dth.step) {
 				learn_element &le = m_elements[i];
 
-				std::vector<ngram> req_ngrams;
-				parser.generate_ngrams(le.request, req_ngrams);
+				parser.generate_ngrams(le.request, le.req_ngrams);
 
-				if (generate_features(le, req_ngrams))
-					generate_negative_element(le, m_negative_elements[i], req_ngrams);
+				if (generate_features(le))
+					generate_negative_element(le, m_negative_elements[i]);
 			}
 		}
 
-		bool generate_features(learn_element &le, const std::vector<ngram> &req_ngrams) {
+		bool generate_features(learn_element &le) {
 			int pos1 = m_id_position[le.doc_ids[0]];
 			int pos2 = m_id_position[le.doc_ids[1]];
 
@@ -140,8 +139,8 @@ class learner {
 			std::vector<ngram> inter = intersect(f, s);
 			le.features.push_back(inter.size());
 
-			le.features.push_back(req_ngrams.size());
-			le.features.push_back(intersect(inter, req_ngrams).size());
+			le.features.push_back(le.req_ngrams.size());
+			le.features.push_back(intersect(inter, le.req_ngrams).size());
 
 			le.valid = true;
 			return true;
@@ -187,12 +186,13 @@ class learner {
 					m_documents.size(), docs_loading_time, m_elements.size(), elements_loading_time);
 		}
 
-		void generate_negative_element(learn_element &le, learn_element &negative, const std::vector<ngram> &req_ngrams) {
+		void generate_negative_element(learn_element &le, learn_element &negative) {
 			int doc_id = le.doc_ids[0];
 
 			negative.doc_ids.push_back(doc_id);
 
 			negative.request = le.request;
+			negative.req_ngrams = le.req_ngrams;
 
 			while (1) {
 				int pos = rand() % m_documents.size();
@@ -205,7 +205,7 @@ class learner {
 				break;
 			}
 
-			generate_features(negative, req_ngrams);
+			generate_features(negative);
 		}
 };
 

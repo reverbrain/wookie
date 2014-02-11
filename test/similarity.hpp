@@ -196,11 +196,13 @@ struct learn_element {
 
 	std::vector<int> doc_ids;
 	std::string request;
+	std::vector<ngram> req_ngrams;
+
 	bool valid;
 
 	std::vector<int> features;
 
-	MSGPACK_DEFINE(doc_ids, request);
+	MSGPACK_DEFINE(doc_ids, request, req_ngrams);
 };
 
 }} // namespace ioremap::similarity

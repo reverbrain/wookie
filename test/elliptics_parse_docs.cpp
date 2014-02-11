@@ -44,8 +44,6 @@ class loader {
 
 			std::set<int> ids;
 
-			std::vector<learn_element> elements;
-
 			std::string line;
 			int line_num = 0;
 			while ((line_num < max_line_num) && std::getline(in, line)) {
@@ -78,29 +76,30 @@ class loader {
 					ids.insert(doc[0]);
 					ids.insert(doc[1]);
 
-					elements.emplace_back(le);
+					m_elements.emplace_back(le);
 				}
 			}
 
 			m_doc_ids.assign(ids.begin(), ids.end());
-
-			elliptics::session session(m_node);
-			session.set_groups(m_groups);
-			session.set_ioflags(DNET_IO_FLAGS_CACHE);
-
-			msgpack::sbuffer buffer;
-			msgpack::pack(&buffer, elements);
-
-			session.write_data(elliptics_element_key(index), elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0).wait();
 
 			int cpunum = std::thread::hardware_concurrency();
 			if (cpunum == 0)
 				cpunum = sysconf(_SC_NPROCESSORS_ONLN);
 
 			add_documents(cpunum);
+
+			elliptics::session session(m_node);
+			session.set_groups(m_groups);
+			session.set_ioflags(DNET_IO_FLAGS_CACHE);
+
+			msgpack::sbuffer buffer;
+			msgpack::pack(&buffer, m_elements);
+
+			session.write_data(elliptics_element_key(index), elliptics::data_pointer::copy(buffer.data(), buffer.size()), 0).wait();
 		}
 
 	private:
+		std::vector<learn_element> m_elements;
 		std::vector<int> m_doc_ids;
 		std::string m_encoding_dir;
 
@@ -163,6 +162,11 @@ class loader {
 				} catch (const std::exception &e) {
 					std::cerr << file << ": caught exception: " << e.what() << std::endl;
 				}
+			}
+
+			for (size_t i = dth->id; i < m_elements.size(); i += dth->step) {
+				learn_element & le = m_elements[i];
+				parser.generate_ngrams(le.request, le.req_ngrams);
 			}
 
 			while (dth->pending) {
