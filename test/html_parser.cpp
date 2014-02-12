@@ -69,10 +69,13 @@ int main(int argc, char *argv[])
 
 	for (auto f : files) {
 		try {
-			parser.feed(f.c_str());
-
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
+
+			if (!parser.feed(f.c_str())) {
+				std::cout << "NOT A TEXT" << std::endl;
+				continue;
+			}
 
 			std::string text = parser.text();
 

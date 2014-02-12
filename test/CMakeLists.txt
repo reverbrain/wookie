@@ -42,12 +42,16 @@ add_executable(wookie_similarity similarity.cpp)
 target_link_libraries(wookie_similarity
 	${LIBTIDY_LIBRARIES}
 	${Boost_LIBRARIES}
+	${LIBMAGIC_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
 )
 
 add_executable(wookie_html_parser html_parser.cpp)
 target_link_libraries(wookie_html_parser
 	${LIBTIDY_LIBRARIES}
 	${Boost_LIBRARIES}
+	${LIBMAGIC_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
 )
 
 add_executable(wookie_encoding encoding.cpp)
@@ -59,17 +63,14 @@ add_executable(wookie_elliptics_parse_docs elliptics_parse_docs.cpp)
 target_link_libraries(wookie_elliptics_parse_docs
 	${LIBTIDY_LIBRARIES}
 	${Boost_LIBRARIES}
-	${elliptics_cpp_LIBRARY}
-	${elliptics_client_LIBRARY}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
+	${LIBMAGIC_LIBRARIES}
 )
 
 add_executable(wookie_elliptics_load_docs elliptics_load_docs.cpp)
 target_link_libraries(wookie_elliptics_load_docs
 	${Boost_LIBRARIES}
-	${elliptics_cpp_LIBRARY}
-	${elliptics_client_LIBRARY}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
 )

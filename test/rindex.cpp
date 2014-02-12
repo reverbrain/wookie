@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "wookie/parser.hpp"
 #include "wookie/storage.hpp"
 #include "wookie/operators.hpp"
 #include "wookie/url.hpp"

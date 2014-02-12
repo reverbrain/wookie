@@ -9,6 +9,7 @@
 #include "wookie/ngram.hpp"
 #include "wookie/parser.hpp"
 #include "wookie/timer.hpp"
+#include "wookie/url.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -85,16 +86,22 @@ class document_parser {
 			close(fd);
 		}
 
-		void feed(const char *path) {
+		bool feed(const char *path) {
 			std::ifstream in(path);
 			if (in.bad())
-				return;
+				return false;
 
 			std::ostringstream ss;
 
 			ss << in.rdbuf();
 
+			std::string text = ss.str();
+
+			if (!m_magic.is_text(text.c_str(), std::min<int>(text.size(), 1024)))
+				return false;
+
 			m_parser.parse(ss.str());
+			return true;
 		}
 
 		std::string text(void) const {
@@ -125,6 +132,7 @@ class document_parser {
 		wookie::ngram::detector m_charset_detector;
 		boost::locale::generator m_gen;
 		std::locale m_loc;
+		wookie::magic m_magic;
 
 		void generate(const std::string &text, std::vector<ngram> &hashes) {
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);

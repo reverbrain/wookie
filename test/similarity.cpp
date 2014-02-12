@@ -102,7 +102,9 @@ class learner {
 
 				std::string file = m_input + lexical_cast(doc.id) + ".html";
 				try {
-					parser.feed(file.c_str());
+					if (!parser.feed(file.c_str()))
+						continue;
+
 					std::string text = parser.text();
 
 					parser.generate_ngrams(text, doc.ngrams);
