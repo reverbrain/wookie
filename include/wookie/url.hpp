@@ -57,7 +57,6 @@ class magic {
 
 		bool is_text(const char *buffer, size_t size) {
 			const char *t = type(buffer, size);
-			std::cout << "type: " << t << std::endl;
 			return !strncmp(t, "text/", 5);
 		}
 
