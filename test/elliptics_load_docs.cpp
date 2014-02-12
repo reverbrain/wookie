@@ -123,7 +123,7 @@ class loader {
 				}
 			}
 
-			printf("elements-processed: %zd, success rate: %zd%%\n", success * 100 / total, total);
+			printf("elements-processed: %zd, success rate: %zd%%\n", total, success * 100 / total);
 		}
 
 	private:
