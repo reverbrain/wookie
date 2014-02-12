@@ -17,12 +17,6 @@
 #ifndef __WOOKIE_URL_HPP
 #define __WOOKIE_URL_HPP
 
-#include "dmanager.hpp"
-#include "parser.hpp"
-#include "storage.hpp"
-
-#include <mutex>
-
 #include <magic.h>
 
 namespace ioremap { namespace wookie {
@@ -62,7 +56,9 @@ class magic {
 		}
 
 		bool is_text(const char *buffer, size_t size) {
-			return !strncmp(type(buffer, size), "text/", 5);
+			const char *t = type(buffer, size);
+			std::cout << "type: " << t << std::endl;
+			return !strncmp(t, "text/", 5);
 		}
 
 	private:
