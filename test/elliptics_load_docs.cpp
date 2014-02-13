@@ -92,6 +92,7 @@ class loader {
 
 			size_t total = 0;
 			size_t success = 0;
+			size_t positive = 0;
 
 			num = std::min<int>(num, m_elements.size());
 			for (int i = 0; i < num; ++i) {
@@ -108,19 +109,23 @@ class loader {
 					s(j) = le.features[j];
 
 				++total;
+				if (le.label == +1)
+					++positive;
 
 				auto l = m_learned_pfunc(s);
-				if (l >= 0.5) {
+				if ((le.label == +1) && (l >= 0.5)) {
+					++success;
+				} else if ((le.label == -1) && (l < 0.5)) {
 					++success;
 				} else {
 					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
 					for (size_t k = 0; k < le.features.size(); ++k)
 						printf("%d ", le.features[k]);
-					printf(": %f\n", l);
+					printf(" -> %d: %f\n", le.label, l);
 				}
 			}
 
-			printf("elements-processed: %zd, success rate: %zd%%\n", total, success * 100 / total);
+			printf("elements-processed: %zd, positive/negative: %zd/%zd, success rate: %zd%%\n", total, positive, total-positive, success * 100 / total);
 		}
 
 	private:
