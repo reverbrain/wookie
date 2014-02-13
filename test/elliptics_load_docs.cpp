@@ -37,44 +37,55 @@ class loader {
 		}
 
 		void load(const std::string &index, const std::string &train_file, int num) {
-			std::vector<std::string> vindexes;
-			vindexes.push_back(index);
 
 			elliptics::session session(m_node);
 			session.set_groups(m_groups);
-			session.set_exceptions_policy(elliptics::session::no_exceptions);
 			session.set_ioflags(DNET_IO_FLAGS_CACHE);
 			session.set_timeout(600);
 
-			std::vector<elliptics::key> keys;
+			try {
+				const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
 
-			auto indexes = session.find_all_indexes(vindexes);
-			for (auto idx = indexes.begin(); idx != indexes.end(); ++idx) {
-				keys.push_back(idx->id);
+				msgpack::unpacked msg;
+				msgpack::unpack(&msg, res.data<char>(), res.size());
+
+				msg.get().convert(&m_elements);
+			} catch (const std::exception &e) {
+				fprintf(stderr, "Could not get elements array: %s\n", e.what());
+				return;
 			}
 
-			m_documents.reserve(keys.size());
+			try {
+				std::vector<std::string> vindexes;
+				vindexes.push_back(index);
 
-			session.bulk_read(keys).connect(std::bind(&loader::result_callback, this, std::placeholders::_1),
-					std::bind(&loader::final_callback, this, std::placeholders::_1));
+				std::vector<elliptics::key> keys;
 
-			while (!m_done) {
-				std::unique_lock<std::mutex> guard(m_cond_lock);
-				m_cond.wait(guard);
+				auto indexes = session.find_all_indexes(vindexes);
+				for (auto idx = indexes.begin(); idx != indexes.end(); ++idx) {
+					keys.push_back(idx->id);
+				}
+
+				m_documents.reserve(keys.size());
+
+				session.bulk_read(keys).connect(std::bind(&loader::result_callback, this, std::placeholders::_1),
+						std::bind(&loader::final_callback, this, std::placeholders::_1));
+
+				while (!m_done) {
+					std::unique_lock<std::mutex> guard(m_cond_lock);
+					m_cond.wait(guard);
+				}
+
+				for (size_t i = 0; i < m_documents.size(); ++i) {
+					const simdoc & doc = m_documents[i];
+					m_id_position[doc.id] = i;
+				}
+
+				printf("loaded: keys: %zd, documents: %zd, learn-elements: %zd\n", keys.size(), m_documents.size(), m_elements.size());
+			} catch (const std::exception &e) {
+				fprintf(stderr, "Could not read documents: %s\n", e.what());
+				return;
 			}
-
-			for (size_t i = 0; i < m_documents.size(); ++i) {
-				const simdoc & doc = m_documents[i];
-				m_id_position[doc.id] = i;
-			}
-
-			const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
-
-			msgpack::unpacked msg;
-			msgpack::unpack(&msg, res.data<char>(), res.size());
-
-			msg.get().convert(&m_elements);
-			printf("loaded: keys: %zd, documents: %zd, learn-elements: %zd\n", keys.size(), m_documents.size(), m_elements.size());
 
 			std::ifstream fin(train_file.c_str(), std::ios::binary);
 			dlib::deserialize(m_learned_pfunc, fin);
