@@ -49,7 +49,7 @@ class dlib_learner {
 
 			dlib::randomize_samples(m_samples, m_labels);
 
-			size_t nsize = m_samples.size() / 10;
+			size_t nsize = m_samples.size() * 9 / 10;
 
 			std::vector<sample_type> test_samples(std::make_move_iterator(m_samples.begin() + nsize), std::make_move_iterator(m_samples.end()));
 			m_samples.erase(m_samples.begin() + nsize, m_samples.end());
