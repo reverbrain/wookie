@@ -73,9 +73,24 @@ class learner {
 			add_documents(num);
 
 			dlib_learner dl;
+			size_t positive, negative;
+			positive = negative = 0;
 
 			for (size_t i = 0; i < m_elements.size(); ++i) {
-				dl.add_sample(m_elements[i]);
+				const learn_element & le = m_elements[i];
+
+				if (!le.valid)
+					continue;
+
+				if (le.label > 0) {
+					positive++;
+					dl.add_sample(le);
+				} else {
+					negative++;
+
+					if (negative < positive * 2)
+						dl.add_sample(le);
+				}
 			}
 
 			dl.train_and_test(output);
