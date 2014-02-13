@@ -56,7 +56,7 @@ class loader {
 				int label;
 
 				int num = sscanf(line.c_str(), "%d\t%d\t%d\t", &doc[0], &doc[1], &label);
-				if (num != 2) {
+				if (num != 3) {
 					fprintf(stderr, "failed to parse string: %d, tokens found: %d\n", line_num, num);
 					break;
 				}
