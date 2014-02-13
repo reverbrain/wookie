@@ -23,9 +23,10 @@ class learner {
 				line_num++;
 
 				int doc[2];
+				int label;
 
-				int num = sscanf(line.c_str(), "%d\t%d\t", &doc[0], &doc[1]);
-				if (num != 2) {
+				int num = sscanf(line.c_str(), "%d\t%d\t%d\t", &doc[0], &doc[1], &label);
+				if (num != 3) {
 					fprintf(stderr, "failed to parse string: %d, tokens found: %d\n", line_num, num);
 					continue;
 				}
@@ -42,6 +43,10 @@ class learner {
 
 					le.doc_ids = std::vector<int>(doc, doc+2);
 					le.request.assign(pos);
+
+					le.label = -1;
+					if (label)
+						le.label = +1;
 
 					ids.insert(doc[0]);
 					ids.insert(doc[1]);
@@ -71,8 +76,7 @@ class learner {
 			dlib_learner dl;
 
 			for (size_t i = 0; i < m_elements.size(); ++i) {
-				dl.add_sample(m_elements[i], +1);
-				dl.add_sample(m_negative_elements[i], -1);
+				dl.add_sample(m_elements[i]);
 			}
 
 			dl.train_and_test(output);

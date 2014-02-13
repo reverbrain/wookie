@@ -53,8 +53,9 @@ class loader {
 				line_num++;
 
 				int doc[2];
+				int label;
 
-				int num = sscanf(line.c_str(), "%d\t%d\t", &doc[0], &doc[1]);
+				int num = sscanf(line.c_str(), "%d\t%d\t%d\t", &doc[0], &doc[1], &label);
 				if (num != 2) {
 					fprintf(stderr, "failed to parse string: %d, tokens found: %d\n", line_num, num);
 					break;
@@ -72,6 +73,10 @@ class loader {
 
 					le.doc_ids = std::vector<int>(doc, doc+2);
 					le.request.assign(pos);
+
+					le.label = -1;
+					if (label)
+						le.label = +1;
 
 					ids.insert(doc[0]);
 					ids.insert(doc[1]);

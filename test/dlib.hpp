@@ -20,7 +20,7 @@ class dlib_learner {
 
 		dlib_learner() {}
 
-		void add_sample(const learn_element &le, int label) {
+		void add_sample(const learn_element &le) {
 			if (!le.valid)
 				return;
 
@@ -32,7 +32,7 @@ class dlib_learner {
 			}
 
 			m_samples.push_back(s);
-			m_labels.push_back(label);
+			m_labels.push_back(le.label);
 		}
 
 		void train_and_test(const std::string &output) {

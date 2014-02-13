@@ -172,18 +172,19 @@ class document_parser {
 };
 
 struct learn_element {
-	learn_element() : valid(false) {
+	learn_element() : label(-1), valid(false) {
 	}
 
 	std::vector<int> doc_ids;
 	std::string request;
 	std::vector<ngram> req_ngrams;
 
+	int label;
 	bool valid;
 
 	std::vector<int> features;
 
-	MSGPACK_DEFINE(doc_ids, request, req_ngrams);
+	MSGPACK_DEFINE(doc_ids, label, request, req_ngrams);
 
 	bool generate_features(const simdoc &d1, const simdoc &d2) {
 		const std::vector<ngram> &f = d1.ngrams;
