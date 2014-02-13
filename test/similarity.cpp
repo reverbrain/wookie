@@ -66,7 +66,6 @@ class learner {
 			}
 
 			printf("pairs loaded: %zd\n", m_elements.size());
-			m_negative_elements.resize(m_elements.size());
 
 			int num = std::thread::hardware_concurrency();
 			if (num == 0)
@@ -90,7 +89,6 @@ class learner {
 		std::map<int, int> m_id_position;
 
 		std::vector<learn_element> m_elements;
-		std::vector<learn_element> m_negative_elements;
 
 		struct doc_thread {
 			int id;
@@ -132,8 +130,7 @@ class learner {
 				const simdoc &d1 = m_documents[pos1];
 				const simdoc &d2 = m_documents[pos2];
 
-				if (le.generate_features(d1, d2))
-					generate_negative_element(le, m_negative_elements[i]);
+				le.generate_features(d1, d2);
 			}
 		}
 
@@ -175,31 +172,6 @@ class learner {
 
 			printf("documents: %zd, load-time: %ld msec, elements: %zd, load-time: %ld msec\n",
 					m_documents.size(), docs_loading_time, m_elements.size(), elements_loading_time);
-		}
-
-		void generate_negative_element(learn_element &le, learn_element &negative) {
-			negative.doc_ids.push_back(le.doc_ids[0]);
-
-			negative.request = le.request;
-			negative.req_ngrams = le.req_ngrams;
-
-			while (1) {
-				int pos = rand() % m_documents.size();
-				const simdoc &next = m_documents[pos];
-
-				if ((next.id == le.doc_ids[0]) || !next.ngrams.size() || (next.id == le.doc_ids[1]))
-					continue;
-
-				negative.doc_ids.push_back(next.id);
-				break;
-			}
-
-			int pos1 = m_id_position[negative.doc_ids[0]];
-			int pos2 = m_id_position[negative.doc_ids[1]];
-
-			const simdoc &d1 = m_documents[pos1];
-			const simdoc &d2 = m_documents[pos2];
-			negative.generate_features(d1, d2);
 		}
 };
 

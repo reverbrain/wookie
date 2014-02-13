@@ -86,21 +86,17 @@ class loader {
 			for (int i = 0; i < num; ++i) {
 				size_t lepos = rand() % m_elements.size();
 				learn_element & le = m_elements[lepos];
-				learn_element negative;
 
-				if (!make_element(le, negative))
+				if (!make_element(le))
 					continue;
 
-				dlib_learner::sample_type s, n;
+				dlib_learner::sample_type s;
 				s.set_size(le.features.size());
-				n.set_size(negative.features.size());
 
 				for (size_t j = 0; j < le.features.size(); ++j)
 					s(j) = le.features[j];
-				for (size_t j = 0; j < negative.features.size(); ++j)
-					n(j) = negative.features[j];
 
-				total += 2;
+				++total;
 
 				auto l = m_learned_pfunc(s);
 				if (l >= 0.5) {
@@ -109,16 +105,6 @@ class loader {
 					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
 					for (size_t k = 0; k < le.features.size(); ++k)
 						printf("%d ", le.features[k]);
-					printf(": %f\n", l);
-				}
-
-				l = m_learned_pfunc(n);
-				if (l < 0.5) {
-					++success;
-				} else {
-					printf("negative documents: %d,%d, req: '%s', features: ", negative.doc_ids[0], negative.doc_ids[1], negative.request.c_str());
-					for (size_t k = 0; k < negative.features.size(); ++k)
-						printf("%d ", negative.features[k]);
 					printf(": %f\n", l);
 				}
 			}
@@ -142,7 +128,7 @@ class loader {
 
 		dlib_learner::pfunct_type m_learned_pfunc;
 
-		bool make_element(learn_element &le, learn_element &negative) {
+		bool make_element(learn_element &le) {
 			try {
 				int pos1 = m_id_position[le.doc_ids[0]];
 				int pos2 = m_id_position[le.doc_ids[1]];
@@ -152,39 +138,11 @@ class loader {
 
 				if (!le.generate_features(d1, d2))
 					return false;
-
-				generate_negative_element(le, negative);
 				return true;
 			} catch (const std::exception &e) {
 				fprintf(stderr, "learn element check failed: documents: %d,%d, error: %s\n", le.doc_ids[0], le.doc_ids[1], e.what());
 				return false;
 			}
-		}
-
-		void generate_negative_element(learn_element &le, learn_element &negative) {
-			negative.doc_ids.push_back(le.doc_ids[0]);
-
-			negative.request = le.request;
-			negative.req_ngrams = le.req_ngrams;
-
-			while (1) {
-				int pos = rand() % m_documents.size();
-				const simdoc &next = m_documents[pos];
-
-				if ((next.id == le.doc_ids[0]) || !next.ngrams.size() || (next.id == le.doc_ids[1]))
-					continue;
-
-				negative.doc_ids.push_back(next.id);
-				break;
-			}
-
-			int pos1 = m_id_position[negative.doc_ids[0]];
-			int pos2 = m_id_position[negative.doc_ids[1]];
-
-			const simdoc &d1 = m_documents[pos1];
-			const simdoc &d2 = m_documents[pos2];
-
-			negative.generate_features(d1, d2);
 		}
 
 		void result_callback(const elliptics::read_result_entry &result) {
