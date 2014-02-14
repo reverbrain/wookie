@@ -93,7 +93,7 @@ class learner {
 				}
 			}
 
-			dl.train_and_test(output);
+			dl.train_and_test(output, 0.9);
 		}
 
 	private:

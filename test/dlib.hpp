@@ -3,6 +3,8 @@
 
 #include "similarity.hpp"
 
+#include "wookie/score.hpp"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <dlib/svm.h>
@@ -35,7 +37,7 @@ class dlib_learner {
 			m_labels.push_back(le.label);
 		}
 
-		void train_and_test(const std::string &output) {
+		void train_and_test(const std::string &output, double check_part) {
 			dlib::vector_normalizer<sample_type> normalizer;
 
 			normalizer.train(m_samples);
@@ -49,7 +51,7 @@ class dlib_learner {
 
 			dlib::randomize_samples(m_samples, m_labels);
 
-			size_t nsize = m_samples.size() * 9 / 10;
+			size_t nsize = m_samples.size() * check_part;
 
 			std::vector<sample_type> test_samples(std::make_move_iterator(m_samples.begin() + nsize), std::make_move_iterator(m_samples.end()));
 			m_samples.erase(m_samples.begin() + nsize, m_samples.end());
@@ -59,29 +61,10 @@ class dlib_learner {
 
 			pfunct_type learned_function;
 			learned_function.normalizer = normalizer;
-			learned_function.function = dlib::train_probabilistic_decision_function(trainer, m_samples, m_labels, 5);
+			learned_function.function = dlib::train_probabilistic_decision_function(trainer, m_samples, m_labels, 3);
 
 			std::cout << "\nnumber of basis vectors in our learned_function is " 
 				<< learned_function.function.decision_funct.basis_vectors.size() << std::endl;
-#if 0
-			double max_gamma = 0.003125;
-
-			double max_accuracy = 0;
-			for (double gamma = 0.000001; gamma <= 1; gamma *= 5) {
-				trainer.set_kernel(kernel_type(gamma));
-
-				std::vector<double> loo_values;
-				trainer.train(m_samples, m_labels, loo_values);
-
-				const double classification_accuracy = dlib::mean_sign_agreement(m_labels, loo_values);
-				std::cout << "gamma: " << gamma << ": LOO accuracy: " << classification_accuracy << std::endl;
-
-				if (classification_accuracy > max_accuracy)
-					max_gamma = gamma;
-			}
-
-			trainer.set_kernel(kernel_type(max_gamma));
-#endif
 
 			std::ofstream out(output.c_str(), std::ios::binary);
 			dlib::serialize(learned_function, out);
@@ -90,8 +73,13 @@ class dlib_learner {
 			long success, total;
 			success = total = 0;
 
+			wookie::score::score score;
+
 			for (size_t i = 0; i < std::min(test_labels.size(), m_samples.size()); ++i) {
 				auto l = learned_function(test_samples[i]);
+
+				score.add(test_labels[i], l);
+
 				if ((l >= 0.5) && (test_labels[i] > 0))
 					success++;
 				if ((l < 0.5) && (test_labels[i] < 0))
@@ -100,7 +88,8 @@ class dlib_learner {
 				total++;
 			}
 
-			printf("success rate: %ld%%\n", success * 100 / total);
+			printf("success rate: %ld%%, precision: %.4f, recall: %.4f, f1: %.4f\n",
+					success * 100 / total, score.precision(), score.recall(), score.f1());
 		}
 
 	private:
