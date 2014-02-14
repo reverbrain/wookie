@@ -86,10 +86,10 @@ class learner {
 					positive++;
 					dl.add_sample(le);
 				} else {
-					negative++;
-
-					if (negative < positive * 2)
+					if (negative < positive * 2) {
+						negative++;
 						dl.add_sample(le);
+					}
 				}
 			}
 
