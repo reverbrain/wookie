@@ -78,7 +78,7 @@ class dlib_learner {
 			for (size_t i = 0; i < std::min(test_labels.size(), m_samples.size()); ++i) {
 				auto l = learned_function(test_samples[i]);
 
-				score.add(test_labels[i], l);
+				score.add(test_labels[i] > 0, l >= 0.5);
 
 				if ((l >= 0.5) && (test_labels[i] > 0))
 					success++;

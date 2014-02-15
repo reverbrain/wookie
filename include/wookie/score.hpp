@@ -62,14 +62,14 @@ class score {
 			return 2.0 * precision() * recall() / (precision() + recall());
 		}
 
-		void add(double value, double measured) {
-			if (measured > 0) {
-				if (value > 0)
+		void add(bool value_positive, bool measured_positive) {
+			if (measured_positive) {
+				if (value_positive)
 					add_true_positive(1);
 				else
 					add_false_positive(1);
 			} else {
-				if (value <= 0)
+				if (!value_positive)
 					add_true_negative(1);
 				else
 					add_false_negative(1);
