@@ -94,6 +94,8 @@ class loader {
 			size_t success = 0;
 			size_t positive = 0;
 
+			wookie::score::score score;
+
 			num = std::min<int>(num, m_elements.size());
 			for (int i = 0; i < num; ++i) {
 				size_t lepos = rand() % m_elements.size();
@@ -113,6 +115,8 @@ class loader {
 					++positive;
 
 				auto l = m_learned_pfunc(s);
+				score.add(le.label > 0, l >= 0.5);
+
 				if ((le.label == +1) && (l >= 0.5)) {
 					++success;
 				} else if ((le.label == -1) && (l < 0.5)) {
@@ -125,7 +129,10 @@ class loader {
 				}
 			}
 
-			printf("elements-processed: %zd, positive/negative: %zd/%zd, success rate: %zd%%\n", total, positive, total-positive, success * 100 / total);
+			printf("elements-processed: %zd, positive/negative: %zd/%zd, success rate: %zd%%, "
+					"precision: %f, recall: %f, f1: %f\n",
+					total, positive, total-positive, success * 100 / total,
+					score.precision(), score.recall(), score.f1());
 		}
 
 	private:
