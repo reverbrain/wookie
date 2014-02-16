@@ -97,6 +97,7 @@ class loader {
 			elliptics::session session(m_node);
 			session.set_groups(m_groups);
 			session.set_ioflags(DNET_IO_FLAGS_CACHE);
+			session.set_namespace(m_namespace.c_str(), m_namespace.size());
 
 			msgpack::sbuffer buffer;
 			msgpack::pack(&buffer, m_elements);
