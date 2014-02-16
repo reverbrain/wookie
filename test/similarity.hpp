@@ -8,6 +8,7 @@
 #include "wookie/lexical_cast.hpp"
 #include "wookie/ngram.hpp"
 #include "wookie/parser.hpp"
+#include "wookie/tfidf.hpp"
 #include "wookie/timer.hpp"
 #include "wookie/url.hpp"
 
@@ -126,6 +127,9 @@ class document_parser {
 			generate(text, ngrams);
 		}
 
+		std::vector<wookie::tfidf::word_info> top(size_t num) {
+			return m_tfidf.top(num);
+		}
 
 	private:
 		wookie::parser m_parser;
@@ -133,17 +137,23 @@ class document_parser {
 		boost::locale::generator m_gen;
 		std::locale m_loc;
 		wookie::magic m_magic;
+		wookie::tfidf::tfidf m_tfidf;
 
 		void generate(const std::string &text, std::vector<ngram> &hashes) {
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
 			wmap.rule(lb::word_any);
 
 			std::ostringstream tokens;
+			std::set<std::string> unique_tokens;
 
 			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
 				std::string token = boost::locale::to_lower(it->str(), m_loc);
 				tokens << token;
+
+				m_tfidf.feed_word_for_one_file(token);
 			}
+
+			m_tfidf.update_collected_df();
 
 			std::string tstr = tokens.str();
 			lb::ssegment_index cmap(lb::character, tstr.begin(), tstr.end(), m_loc);
