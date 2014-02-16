@@ -38,14 +38,6 @@ INCLUDE(../cmake/locate_library.cmake)
 LOCATE_LIBRARY(DLIB "dlib/svm.h" "")
 include_directories(${DLIB_INCLUDE_DIRS})
 
-add_executable(wookie_similarity similarity.cpp)
-target_link_libraries(wookie_similarity
-	${LIBTIDY_LIBRARIES}
-	${Boost_LIBRARIES}
-	${LIBMAGIC_LIBRARIES}
-	${ELLIPTICS_LIBRARIES}
-)
-
 add_executable(wookie_html_parser html_parser.cpp)
 target_link_libraries(wookie_html_parser
 	${LIBTIDY_LIBRARIES}
