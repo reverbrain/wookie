@@ -127,7 +127,8 @@ class loader {
 				} else if ((le.label == -1) && (l < 0.5)) {
 					++success;
 				} else {
-					printf("documents: %d,%d, req: '%s', features: ", le.doc_ids[0], le.doc_ids[1], le.request.c_str());
+					printf("documents: %d,%d, req: '%s', features (%zd): ",
+						le.doc_ids[0], le.doc_ids[1], le.request.c_str(), le.features.size());
 					for (size_t k = 0; k < le.features.size(); ++k)
 						printf("%d ", le.features[k]);
 					printf(" -> %d: %f\n", le.label, l);
