@@ -16,10 +16,11 @@ using namespace ioremap::similarity;
 
 class loader {
 	public:
-		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level) :
+		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level, const std::string &ns) :
 		m_done(false),
 		m_logger(log.c_str(), level),
-		m_node(m_logger) {
+		m_node(m_logger),
+		m_namespace(ns) {
 			m_node.add_remote(remote.c_str());
 
 			struct digitizer {
@@ -37,11 +38,11 @@ class loader {
 		}
 
 		void load(const std::string &index, const std::string &train_file, int num) {
-
 			elliptics::session session(m_node);
 			session.set_groups(m_groups);
 			session.set_ioflags(DNET_IO_FLAGS_CACHE);
 			session.set_timeout(600);
+			session.set_namespace(m_namespace.c_str(), m_namespace.size());
 
 			try {
 				const auto & res = session.read_data(elliptics_element_key(index), 0, 0).get_one().file();
@@ -148,6 +149,7 @@ class loader {
 		elliptics::file_logger m_logger;
 		elliptics::node m_node;
 		std::vector<int> m_groups;
+		std::string m_namespace;
 
 		dlib_learner::pfunct_type m_learned_pfunc;
 
@@ -205,7 +207,7 @@ int main(int argc, char *argv[])
 	bpo::options_description generic("Similarity options");
 
 	std::string train_file, index;
-	std::string remote, group_string;
+	std::string remote, group_string, ns;
 	std::string log_file;
 	int log_level;
 	int num;
@@ -216,6 +218,7 @@ int main(int argc, char *argv[])
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
 		("num", bpo::value<int>(&num)->default_value(125), "Number of test samples randomly picked from the list of learn elements")
 
+		("namespace", bpo::value<std::string>(&ns), "Elliptics namespace")
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
 		("groups", bpo::value<std::string>(&group_string)->required(), "Colon seaprated list of groups")
 		("log", bpo::value<std::string>(&log_file)->default_value("/dev/stdout"), "Elliptics log file")
@@ -238,7 +241,7 @@ int main(int argc, char *argv[])
 	}
 
 	try {
-		loader el(remote, group_string, log_file, log_level);
+		loader el(remote, group_string, log_file, log_level, ns);
 		el.load(index, train_file, num);
 
 	} catch (const std::exception &e) {

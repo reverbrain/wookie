@@ -15,9 +15,10 @@ using namespace ioremap::similarity;
 
 class loader {
 	public:
-		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level) :
+		loader(const std::string &remote, const std::string &group_string, const std::string &log, int level, const std::string &ns) :
 		m_logger(log.c_str(), level),
-		m_node(m_logger) {
+		m_node(m_logger),
+		m_namespace(ns) {
 			m_node.add_remote(remote.c_str());
 
 			struct digitizer {
@@ -114,9 +115,10 @@ class loader {
 		elliptics::file_logger m_logger;
 		elliptics::node m_node;
 		std::vector<int> m_groups;
+		std::string m_namespace;
 
 		struct doc_thread {
-			static const int max_pending = 10;
+			static const int max_pending = 100;
 			int id;
 			int step;
 
@@ -133,6 +135,7 @@ class loader {
 			document_parser parser;
 			parser.load_encodings(m_encoding_dir);
 
+			dth->session.set_namespace(m_namespace.c_str(), m_namespace.size());
 			dth->session.set_groups(m_groups);
 			dth->session.set_exceptions_policy(elliptics::session::no_exceptions);
 			dth->session.set_ioflags(DNET_IO_FLAGS_CACHE);
@@ -162,7 +165,6 @@ class loader {
 						std::cout << "going to sleep: " << dth->pending << std::endl;
 						std::unique_lock<std::mutex> guard(dth->lock);
 						dth->cond.wait(guard);
-						std::cout << "going to sleep: " << dth->pending << std::endl;
 					}
 
 				} catch (const std::exception &e) {
@@ -229,7 +231,7 @@ int main(int argc, char *argv[])
 	bpo::options_description generic("Similarity options");
 
 	std::string input_dir, pairs, index, enc_dir;
-	std::string remote, group_string;
+	std::string remote, group_string, ns;
 	std::string log_file;
 	int log_level;
 	int num;
@@ -242,6 +244,7 @@ int main(int argc, char *argv[])
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Directory with charset statistics files")
 		("num", bpo::value<int>(&num)->default_value(2), "Number of pairs to read")
 
+		("namespace", bpo::value<std::string>(&ns), "Elliptics namespace")
 		("remote", bpo::value<std::string>(&remote)->required(), "Remote elliptics server")
 		("groups", bpo::value<std::string>(&group_string)->required(), "Colon separated list of groups")
 		("log", bpo::value<std::string>(&log_file)->default_value("/dev/stdout"), "Elliptics log file")
@@ -264,7 +267,7 @@ int main(int argc, char *argv[])
 	}
 
 	try {
-		loader el(remote, group_string, log_file, log_level);
+		loader el(remote, group_string, log_file, log_level, ns);
 		el.load(index, enc_dir, input_dir, pairs, num);
 
 	} catch (const std::exception &e) {
