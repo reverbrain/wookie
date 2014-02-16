@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	generic.add_options()
 		("help", "This help message")
 		("tokenize", "Tokenize text")
-		("tdidf", bpo::value<size_t>(&word_freq_num), "Show N most valuable words according to TF-IDF score")
+		("tfidf", bpo::value<size_t>(&word_freq_num), "Show N most valuable words according to TF-IDF score")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		("ngrams", "Generate ngrams and their intersection")
 		;
