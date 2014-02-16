@@ -51,11 +51,11 @@ class score {
 		}
 
 		double precision() {
-			return m_true_positive.value / (m_true_positive.value + m_false_positive.value);
+			return (double)m_true_positive.value / (double)(m_true_positive.value + m_false_positive.value);
 		}
 
 		double recall() {
-			return m_true_positive.value / (m_true_positive.value + m_false_negative.value);
+			return (double)m_true_positive.value / (double)(m_true_positive.value + m_false_negative.value);
 		}
 
 		double f1() {
