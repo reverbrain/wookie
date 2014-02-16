@@ -24,11 +24,13 @@ int main(int argc, char *argv[])
 	namespace bpo = boost::program_options;
 
 	bpo::options_description generic("Document parser options");
+	size_t word_freq_num = 0;
 
 	std::string enc_dir;
 	generic.add_options()
 		("help", "This help message")
 		("tokenize", "Tokenize text")
+		("tdidf", bpo::value<size_t>(&word_freq_num), "Show N most valuable words according to TF-IDF score")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		("ngrams", "Generate ngrams and their intersection")
 		;
@@ -103,6 +105,14 @@ int main(int argc, char *argv[])
 			}
 		} catch (const std::exception &e) {
 			std::cerr << f << ": caught exception: " << e.what() << std::endl;
+		}
+	}
+
+	if (word_freq_num != 0) {
+		std::vector<wookie::tfidf::word_info> ret = parser.top(word_freq_num);
+		printf("TF-IDF (%zd)\n", word_freq_num);
+		for (auto it = ret.begin(); it != ret.end(); ++it) {
+			printf("  %s : %F\n", it->word.c_str(), it->freq);
 		}
 	}
 
