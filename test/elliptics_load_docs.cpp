@@ -37,7 +37,7 @@ class loader {
 			srand(time(NULL));
 		}
 
-		void load(const std::string &index, const std::string &train_file, int num) {
+		void load(const std::string &index) {
 			elliptics::session session(m_node);
 			session.set_groups(m_groups);
 			session.set_ioflags(DNET_IO_FLAGS_CACHE);
@@ -87,7 +87,9 @@ class loader {
 				fprintf(stderr, "Could not read documents: %s\n", e.what());
 				return;
 			}
+		}
 
+		void check(const std::string &train_file, int num) {
 			std::ifstream fin(train_file.c_str(), std::ios::binary);
 			dlib::deserialize(m_learned_pfunc, fin);
 
@@ -134,6 +136,38 @@ class loader {
 					"precision: %f, recall: %f, f1: %f\n",
 					total, positive, total-positive, success * 100 / total,
 					score.precision(), score.recall(), score.f1());
+		}
+
+		void train(const std::string &train_file) {
+			dlib_learner dl;
+
+			size_t positive = 0;
+			size_t negative = 0;
+			size_t invalid = 0;
+
+			for (size_t i = 0; i < m_elements.size(); ++i) {
+				const learn_element & le = m_elements[i];
+
+				if (!le.valid) {
+					invalid++;
+					continue;
+				}
+
+				if (le.label > 0) {
+					positive++;
+					dl.add_sample(le);
+				} else {
+					if (negative < positive * 2) {
+						negative++;
+						dl.add_sample(le);
+					}
+				}
+			}
+
+			printf("trained: positive: %zd, negative: %zd, total: %zd, invalid: %zd, total-elements: %zd\n",
+					positive, negative, positive + negative, invalid, m_elements.size());
+
+			dl.train_and_test(train_file, 0.9);
 		}
 
 	private:
@@ -206,7 +240,7 @@ int main(int argc, char *argv[])
 
 	bpo::options_description generic("Similarity options");
 
-	std::string train_file, index;
+	std::string train_file, index, mode;
 	std::string remote, group_string, ns;
 	std::string log_file;
 	int log_level;
@@ -214,6 +248,7 @@ int main(int argc, char *argv[])
 
 	generic.add_options()
 		("help", "This help message")
+		("mode", bpo::value<std::string>(&mode)->required(), "Mode: train/check")
 		("model-file", bpo::value<std::string>(&train_file)->required(), "ML model file")
 		("index", bpo::value<std::string>(&index)->required(), "Elliptics index for loaded objects")
 		("num", bpo::value<int>(&num)->default_value(125), "Number of test samples randomly picked from the list of learn elements")
@@ -242,7 +277,15 @@ int main(int argc, char *argv[])
 
 	try {
 		loader el(remote, group_string, log_file, log_level, ns);
-		el.load(index, train_file, num);
+		el.load(index);
+
+		if (mode == "train") {
+			el.train(train_file);
+		}
+
+		if (mode == "check") {
+			el.check(train_file, num);
+		}
 
 	} catch (const std::exception &e) {
 		std::cerr << "exception: " << e.what() << std::endl;
