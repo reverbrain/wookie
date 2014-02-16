@@ -53,7 +53,7 @@ class loader {
 				msg.get().convert(&m_elements);
 			} catch (const std::exception &e) {
 				fprintf(stderr, "Could not get elements array: %s\n", e.what());
-				return;
+				throw;
 			}
 
 			try {
@@ -82,10 +82,12 @@ class loader {
 					m_id_position[doc.id] = i;
 				}
 
-				printf("loaded: keys: %zd, documents: %zd, learn-elements: %zd\n", keys.size(), m_documents.size(), m_elements.size());
+				printf("loaded: keys: %zd, documents: %zd, learn-elements: %zd\n",
+						keys.size(), m_documents.size(), m_elements.size());
+
 			} catch (const std::exception &e) {
 				fprintf(stderr, "Could not read documents: %s\n", e.what());
-				return;
+				throw;
 			}
 		}
 
