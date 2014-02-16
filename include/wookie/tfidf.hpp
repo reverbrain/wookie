@@ -17,7 +17,9 @@
 #ifndef __WOOKIE_TDIDF_HPP
 #define __WOOKIE_TDIDF_HPP
 
+#include <algorithm>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -26,6 +28,11 @@ namespace ioremap { namespace wookie { namespace tfidf {
 struct word_info {
 	std::string word;
 	double freq;
+
+	// sort in descending order
+	bool operator ()(const word_info &f, const word_info &s) {
+		return f.freq >= s.freq;
+	}
 };
 
 class tf {
@@ -43,8 +50,17 @@ class tf {
 			++m_total_words;
 		}
 
+		size_t count(const std::string &word) {
+			size_t num = 0;
+			auto it = m_words.find(word);
+			if (it != m_words.end())
+				num = it->second;
+
+			return num;
+		}
+
 		double freq(const std::string &word, bool lsmooth) {
-			double up = (double)m_words[word];
+			double up = (double)count(word);
 			if (lsmooth)
 				up += 1.0;
 
@@ -70,13 +86,10 @@ class tf {
 
 class tfidf {
 	public:
-		tfidf() : m_need_sort(false) {}
+		tfidf() {}
 
 		void feed_word_for_one_file(const std::string &word) {
-			m_tf.feed_word(word);
-
 			m_unique.insert(word);
-			m_need_sort = true;
 		}
 
 		void update_collected_df() {
@@ -86,34 +99,27 @@ class tfidf {
 			m_unique.clear();
 		}
 
-		std::vector<word_info> top(size_t num) {
-			if (m_need_sort) {
-				m_wi.clear();
-				m_wi.reserve(m_tf.word_count());
+		std::vector<word_info> top(const tf &tf, size_t num) {
+			std::vector<word_info> wis;
+			wis.reserve(tf.word_count());
 
-				for (auto it = m_tf.words().begin(); it != m_tf.words().end(); ++it) {
-					word_info wi;
+			for (auto it = tf.words().begin(); it != tf.words().end(); ++it) {
+				word_info wi;
 
-					wi.word = it->first;
-					wi.freq = it->second / m_df.freq(it->first, true);
+				wi.word = it->first;
+				wi.freq = (double)it->second / m_df.count(it->first);
 
-					m_wi.emplace_back(wi);
-				}
-
-				m_need_sort = false;
+				wis.emplace_back(wi);
 			}
 
-			std::vector<word_info> ret(m_wi.begin(), m_wi.begin() + std::min(num, m_wi.size()));
-			return ret;
+			std::sort(wis.begin(), wis.end(), word_info());
+			wis.resize(std::min(num, wis.size()));
+			return wis;
 		}
 
 	private:
-		wookie::tfidf::tf m_tf;
 		wookie::tfidf::tf m_df;
 		std::set<std::string> m_unique;
-
-		bool m_need_sort;
-		std::vector<word_info> m_wi;
 };
 
 }}} // namespace ioremap::wookie::tfidf
