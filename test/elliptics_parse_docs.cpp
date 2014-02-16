@@ -151,7 +151,8 @@ class loader {
 					if (!parser.feed(file.c_str()))
 						continue;
 
-					doc.text = parser.text();
+					doc.name = file;
+					doc.text = parser.text(doc.tf, true);
 					parser.generate_ngrams(doc.text, doc.ngrams);
 
 					msgpack::sbuffer buffer;

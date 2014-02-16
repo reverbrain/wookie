@@ -105,7 +105,7 @@ class document_parser {
 			return true;
 		}
 
-		std::string text(void) const {
+		std::string text(wookie::tfidf::tf &tf, bool tokenize) {
 			std::string text = m_parser.text(" ");
 			std::string enc = m_charset_detector.detect(text);
 			//printf("encoding: %s, text-length: %zd\n", enc.c_str(), text.size());
@@ -117,46 +117,32 @@ class document_parser {
 				//printf("coverted: %s -> %s, %zd -> %zd\n", enc.c_str(), "utf8", text.size(), out.size());
 
 				if (out.size() > text.size() / 3)
-					return out;
+					text = out;
+			}
+
+			if (tokenize) {
+				lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
+				wmap.rule(lb::word_any);
+
+				std::ostringstream tokens;
+
+				for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+					std::string token = boost::locale::to_lower(it->str(), m_loc);
+					tokens << token << " ";
+
+					m_tfidf.feed_word_for_one_file(token);
+					tf.feed_word(token);
+				}
+
+				m_tfidf.update_collected_df();
+				text = tokens.str();
 			}
 
 			return text;
 		}
 
 		void generate_ngrams(const std::string &text, std::vector<ngram> &ngrams) {
-			generate(text, ngrams);
-		}
-
-		std::vector<wookie::tfidf::word_info> top(size_t num) {
-			return m_tfidf.top(num);
-		}
-
-	private:
-		wookie::parser m_parser;
-		wookie::ngram::detector m_charset_detector;
-		boost::locale::generator m_gen;
-		std::locale m_loc;
-		wookie::magic m_magic;
-		wookie::tfidf::tfidf m_tfidf;
-
-		void generate(const std::string &text, std::vector<ngram> &hashes) {
-			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
-			wmap.rule(lb::word_any);
-
-			std::ostringstream tokens;
-			std::set<std::string> unique_tokens;
-
-			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-				std::string token = boost::locale::to_lower(it->str(), m_loc);
-				tokens << token;
-
-				m_tfidf.feed_word_for_one_file(token);
-			}
-
-			m_tfidf.update_collected_df();
-
-			std::string tstr = tokens.str();
-			lb::ssegment_index cmap(lb::character, tstr.begin(), tstr.end(), m_loc);
+			lb::ssegment_index cmap(lb::character, text.begin(), text.end(), m_loc);
 			cmap.rule(lb::character_any);
 
 			std::list<std::string> ng;
@@ -171,14 +157,26 @@ class document_parser {
 					ngram tmp_ngram = 0;
 					memcpy(&tmp_ngram, txt.data(), std::min(sizeof(ngram), txt.size()));
 
-					hashes.push_back(tmp_ngram);
+					ngrams.push_back(tmp_ngram);
 					ng.pop_front();
 				}
 			}
 
-			std::set<long> tmp(hashes.begin(), hashes.end());
-			hashes.assign(tmp.begin(), tmp.end());
+			std::set<long> tmp(ngrams.begin(), ngrams.end());
+			ngrams.assign(tmp.begin(), tmp.end());
 		}
+
+		std::vector<wookie::tfidf::word_info> top(const wookie::tfidf::tf &tf, size_t num) {
+			return m_tfidf.top(tf, num);
+		}
+
+	private:
+		wookie::parser m_parser;
+		wookie::ngram::detector m_charset_detector;
+		boost::locale::generator m_gen;
+		std::locale m_loc;
+		wookie::magic m_magic;
+		wookie::tfidf::tfidf m_tfidf;
 };
 
 struct learn_element {

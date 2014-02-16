@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
 		("tokenize", "Tokenize text")
 		("tfidf", bpo::value<size_t>(&word_freq_num), "Show N most valuable words according to TF-IDF score")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
-		("ngrams", "Generate ngrams and their intersection")
 		;
 
 	bpo::positional_options_description p;
@@ -79,40 +78,27 @@ int main(int argc, char *argv[])
 				continue;
 			}
 
-			std::string text = parser.text();
+			simdoc doc;
 
-			if (vm.count("tokenize")) {
-				boost::locale::generator gen;
-				std::locale loc(gen("en_US.UTF8"));
+			doc.name = f;
+			doc.text = parser.text(doc.tf, vm.count("tokenize") != 0);
 
-				namespace lb = boost::locale::boundary;
-				lb::ssegment_index wmap(lb::word, text.begin(), text.end(), loc);
-				wmap.rule(lb::word_any);
+			std::cout << doc.text << std::endl;
+			parser.generate_ngrams(doc.text, doc.ngrams);
 
-				for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-					std::string token = boost::locale::to_lower(it->str(), loc);
-					std::cout << token << " ";
-				}
-				std::cout << std::endl;
-			} else {
-				std::cout << text << std::endl;
-			}
-
-			if (vm.count("ngrams")) {
-				simdoc doc;
-				parser.generate_ngrams(text, doc.ngrams);
-				documents.emplace_back(doc);
-			}
+			documents.emplace_back(doc);
 		} catch (const std::exception &e) {
 			std::cerr << f << ": caught exception: " << e.what() << std::endl;
 		}
 	}
 
 	if (word_freq_num != 0) {
-		std::vector<wookie::tfidf::word_info> ret = parser.top(word_freq_num);
-		printf("TF-IDF (%zd)\n", word_freq_num);
-		for (auto it = ret.begin(); it != ret.end(); ++it) {
-			printf("  %s : %F\n", it->word.c_str(), it->freq);
+		for (auto doc = documents.begin(); doc != documents.end(); ++doc) {
+			printf("%s: TF-IDF (%zd)\n", doc->name.c_str(), word_freq_num);
+			auto ret = parser.top(doc->tf, word_freq_num);
+			for (auto it = ret.begin(); it != ret.end(); ++it) {
+				printf("  %s : %F\n", it->word.c_str(), it->freq);
+			}
 		}
 	}
 

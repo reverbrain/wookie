@@ -1,6 +1,8 @@
 #ifndef __ELLIPTICS_SIMDOC_HPP
 #define __ELLIPTICS_SIMDOC_HPP
 
+#include "wookie/tfidf.hpp"
+
 #include "elliptics/session.hpp"
 
 #include <string>
@@ -24,8 +26,11 @@ struct simdoc {
 	};
 
 	int id;
+	std::string name;
 	std::string text;
 	std::vector<ngram> ngrams;
+
+	wookie::tfidf::tf tf;
 
 	simdoc() : id(0) {}
 };
