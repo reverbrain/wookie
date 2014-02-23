@@ -172,7 +172,8 @@ class loader {
 						continue;
 
 					doc.name = file;
-					doc.text = dth->parser.text(doc.tf, true);
+					doc.text = dth->parser.text(true);
+					dth->parser.update_tfidf(doc.text, doc.tf);
 					dth->parser.generate_ngrams(doc.text, doc.ngrams);
 
 					if (m_normalize_url.empty()) {
@@ -215,6 +216,7 @@ class loader {
 					reply_doc.id, reply_doc.text.size());
 
 			dth->parser.generate_ngrams(reply_doc.text, reply_doc.ngrams);
+			dth->parser.update_tfidf(reply_doc.text, reply_doc.tf);
 			pack_and_send(dth, reply_doc, key);
 		}
 
@@ -321,6 +323,7 @@ class loader {
 			std::thread swarm_thread(std::bind(&loader::start_swarm_service, this));
 
 			std::vector<std::thread> threads;
+			std::vector<std::shared_ptr<doc_thread>> dths;
 
 			wookie::timer tm;
 
@@ -339,11 +342,16 @@ class loader {
 
 				dth->parser.load_encodings(m_encoding_dir);
 
+				dths.push_back(dth);
+
 				threads.emplace_back(std::bind(&loader::load_documents, this, dth));
 			}
 
+			wookie::tfidf::tfidf df;
+
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
+				dths[i]->parser.merge_into(df);
 			}
 
 			threads.clear();

@@ -81,10 +81,11 @@ int main(int argc, char *argv[])
 			simdoc doc;
 
 			doc.name = f;
-			doc.text = parser.text(doc.tf, vm.count("tokenize") != 0);
+			doc.text = parser.text(vm.count("tokenize") != 0);
 
 			std::cout << doc.text << std::endl;
 			parser.generate_ngrams(doc.text, doc.ngrams);
+			parser.update_tfidf(doc.text, doc.tf);
 
 			documents.emplace_back(doc);
 		} catch (const std::exception &e) {
