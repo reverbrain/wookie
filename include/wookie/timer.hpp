@@ -17,6 +17,7 @@
 #ifndef __WOOKIE_TIMER_HPP
 #define __WOOKIE_TIMER_HPP
 
+#include <algorithm>
 #include <chrono>
 
 namespace ioremap { namespace wookie {
