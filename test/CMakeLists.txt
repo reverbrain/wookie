@@ -58,6 +58,8 @@ target_link_libraries(wookie_elliptics_parse_docs
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
 	${LIBMAGIC_LIBRARIES}
+	${SWARM_LIBRARIES}
+	${SWARM_URLFETCHER_LIBRARIES}
 )
 
 add_executable(wookie_elliptics_load_docs elliptics_load_docs.cpp)
@@ -65,4 +67,12 @@ target_link_libraries(wookie_elliptics_load_docs
 	${Boost_LIBRARIES}
 	${MSGPACK_LIBRARIES}
 	${ELLIPTICS_LIBRARIES}
+)
+
+add_executable(wookie_swarm_download swarm.cpp)
+target_link_libraries(wookie_swarm_download
+	${Boost_LIBRARIES}
+	${MSGPACK_LIBRARIES}
+	${SWARM_LIBRARIES}
+	${SWARM_URLFETCHER_LIBRARIES}
 )

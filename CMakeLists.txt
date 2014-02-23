@@ -25,7 +25,6 @@ LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 LOCATE_LIBRARY(LIBTIDY "tidy.h" "tidy" "tidy")
 LOCATE_LIBRARY(LIBMAGIC "magic.h" "magic")
 LOCATE_LIBRARY(THEVOID "thevoid/server.hpp" "thevoid")
-LOCATE_LIBRARY(SWARM "swarm/networkmanager.h" "swarm")
 LOCATE_LIBRARY(WARP "warp/lex.hpp" "")
 LOCATE_LIBRARY(RIFT "rift/server.hpp" "rift")
 
