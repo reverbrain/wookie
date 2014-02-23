@@ -202,7 +202,8 @@ class loader {
 					return false;
 				return true;
 			} catch (const std::exception &e) {
-				fprintf(stderr, "learn element check failed: documents: %d,%d, error: %s\n", le.doc_ids[0], le.doc_ids[1], e.what());
+				fprintf(stderr, "learn element check failed: documents: %d,%d, error: %s\n",
+						le.doc_ids[0], le.doc_ids[1], e.what());
 				return false;
 			}
 		}
@@ -219,7 +220,8 @@ class loader {
 					msg.get().convert(&doc);
 
 					std::unique_lock<std::mutex> guard(m_lock);
-					//printf("id: %d, text-size: %zd, ngram-size: %zd\n", doc.id, doc.text.size(), doc.ngrams.size());
+					//printf("id: %d, text-size: %zd, ngram-size: %zd\n",
+					//		doc.id, doc.text.size(), doc.ngrams.size());
 					m_documents.emplace_back(doc);
 				} catch (const std::exception &e) {
 					fprintf(stderr, "exception: id: %s, object-size: %zd, error: %s\n",
