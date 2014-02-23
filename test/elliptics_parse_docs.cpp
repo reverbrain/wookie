@@ -275,7 +275,7 @@ class loader {
 			request.set_follow_location(1);
 			request.set_timeout(1000);
 			request.headers().assign({
-					{ "Expect", ""},
+					{ "Expect", ""}, // must be present to prevent CURL from injecting 'Expect' header into POST requst
 					{ "Content-Type", "text/json" }
 				});
 
