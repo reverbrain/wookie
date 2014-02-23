@@ -39,15 +39,15 @@ class tf {
 	public:
 		tf() : m_total_words(0) {}
 
-		void feed_word(const std::string &word) {
+		void feed_word(const std::string &word, int num = 1) {
 			auto f = m_words.find(word);
 			if (f == m_words.end()) {
-				m_words[word] = 1;
+				m_words[word] = num;
 			} else {
-				f->second++;
+				f->second += num;
 			}
 
-			++m_total_words;
+			m_total_words += num;
 		}
 
 		size_t count(const std::string &word) {
@@ -79,6 +79,10 @@ class tf {
 			return m_words;
 		}
 
+		size_t total_words(void) const {
+			return m_total_words;
+		}
+
 	private:
 		std::map<std::string, size_t> m_words;
 		size_t m_total_words;
@@ -87,6 +91,12 @@ class tf {
 class tfidf {
 	public:
 		tfidf() {}
+
+		void merge(const tfidf &other) {
+			for (auto it = other.df().words().begin(); it != other.df().words().end(); ++it) {
+				m_df.feed_word(it->first, it->second);
+			}
+		}
 
 		void feed_word_for_one_file(const std::string &word) {
 			m_unique.insert(word);
@@ -115,6 +125,10 @@ class tfidf {
 			std::sort(wis.begin(), wis.end(), word_info());
 			wis.resize(std::min(num, wis.size()));
 			return wis;
+		}
+
+		const wookie::tfidf::tf &df(void) const {
+			return m_df;
 		}
 
 	private:
