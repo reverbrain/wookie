@@ -20,6 +20,7 @@
 #include "wookie/dir.hpp"
 #include "wookie/iconv.hpp"
 #include "wookie/ngram.hpp"
+#include "wookie/tfidf.hpp"
 #include "wookie/url.hpp"
 
 #include <buffio.h>
@@ -184,6 +185,30 @@ class parser {
 			return std::move(ss.str());
 		}
 
+		void update_tfidf(const std::string &text, tfidf::tf &tf) {
+			namespace lb = boost::locale::boundary;
+
+			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
+			wmap.rule(lb::word_any);
+
+			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+				std::string token = boost::locale::to_lower(it->str(), m_loc);
+
+				m_tfidf.feed_word_for_one_file(token);
+				tf.feed_word(token);
+			}
+
+			m_tfidf.update_collected_df();
+		}
+
+		std::vector<tfidf::word_info> top(const tfidf::tf &tf, size_t num) {
+			return m_tfidf.top(tf, num);
+		}
+
+		void merge_into(tfidf::tfidf &df) {
+			df.merge(m_tfidf);
+		}
+
 	private:
 		std::vector<std::string> m_urls;
 		std::vector<std::string> m_tokens;
@@ -192,6 +217,8 @@ class parser {
 		boost::locale::generator m_gen;
 		std::locale m_loc;
 		magic m_magic;
+
+		tfidf::tfidf m_tfidf;
 
 		void reset(void) {
 			m_urls.clear();

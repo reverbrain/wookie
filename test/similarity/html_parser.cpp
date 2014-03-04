@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	document_parser tfidf;
 	wookie::parser parser;
 
 	if (enc_dir.size())
@@ -86,7 +85,7 @@ int main(int argc, char *argv[])
 
 			std::cout << doc.text << std::endl;
 			parser.generate_ngrams(doc.text, doc.ngrams);
-			tfidf.update_tfidf(doc.text, doc.tf);
+			parser.update_tfidf(doc.text, doc.tf);
 
 			documents.emplace_back(doc);
 		} catch (const std::exception &e) {
@@ -97,7 +96,7 @@ int main(int argc, char *argv[])
 	if (word_freq_num != 0) {
 		for (auto doc = documents.begin(); doc != documents.end(); ++doc) {
 			printf("%s: TF-IDF (%zd)\n", doc->name.c_str(), word_freq_num);
-			auto ret = tfidf.top(doc->tf, word_freq_num);
+			auto ret = parser.top(doc->tf, word_freq_num);
 			for (auto it = ret.begin(); it != ret.end(); ++it) {
 				printf("  %s : %F\n", it->word.c_str(), it->freq);
 			}

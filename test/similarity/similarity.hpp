@@ -33,42 +33,6 @@ static inline std::vector<wookie::lngram> intersect(const std::vector<wookie::ln
 	return tmp;
 }
 
-class document_parser {
-	public:
-		document_parser() : m_loc(m_gen("en_US.UTF8")) {
-		}
-
-		void update_tfidf(const std::string &text, wookie::tfidf::tf &tf) {
-			namespace lb = boost::locale::boundary;
-
-			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
-			wmap.rule(lb::word_any);
-
-			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-				std::string token = boost::locale::to_lower(it->str(), m_loc);
-
-				m_tfidf.feed_word_for_one_file(token);
-				tf.feed_word(token);
-			}
-
-			m_tfidf.update_collected_df();
-		}
-
-		std::vector<wookie::tfidf::word_info> top(const wookie::tfidf::tf &tf, size_t num) {
-			return m_tfidf.top(tf, num);
-		}
-
-		void merge_into(wookie::tfidf::tfidf &df) {
-			df.merge(m_tfidf);
-		}
-
-	private:
-		wookie::tfidf::tfidf m_tfidf;
-
-		boost::locale::generator m_gen;
-		std::locale m_loc;
-};
-
 struct learn_element {
 	learn_element() : label(-1), valid(false) {
 	}

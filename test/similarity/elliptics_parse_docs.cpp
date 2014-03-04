@@ -152,7 +152,6 @@ class loader {
 			int step;
 
 			wookie::parser parser;
-			document_parser tfidf;
 
 			std::atomic_int pending;
 			std::mutex lock;
@@ -175,7 +174,7 @@ class loader {
 
 					doc.name = file;
 					doc.text = dth->parser.string_tokens(" ");
-					dth->tfidf.update_tfidf(doc.text, doc.tf);
+					dth->parser.update_tfidf(doc.text, doc.tf);
 					dth->parser.generate_ngrams(doc.text, doc.ngrams);
 
 					if (m_normalize_url.empty()) {
@@ -218,7 +217,7 @@ class loader {
 					reply_doc.id, reply_doc.text.size());
 
 			dth->parser.generate_ngrams(reply_doc.text, reply_doc.ngrams);
-			dth->tfidf.update_tfidf(reply_doc.text, reply_doc.tf);
+			dth->parser.update_tfidf(reply_doc.text, reply_doc.tf);
 			pack_and_send(dth, reply_doc, key);
 		}
 
@@ -353,7 +352,7 @@ class loader {
 
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
-				dths[i]->tfidf.merge_into(df);
+				dths[i]->parser.merge_into(df);
 			}
 
 			threads.clear();
