@@ -3,6 +3,7 @@
 
 #include "simdoc.hpp"
 
+#include "wookie/dir.hpp"
 #include "wookie/iconv.hpp"
 #include "wookie/hash.hpp"
 #include "wookie/lexical_cast.hpp"
@@ -22,17 +23,6 @@
 #include <boost/program_options.hpp>
 
 #include <msgpack.hpp>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <string.h>
 
 namespace ioremap { namespace similarity {
 
@@ -58,33 +48,8 @@ class document_parser {
 		}
 
 		void load_encodings(const std::string &base) {
-			int fd;
-			DIR *dir;
-			struct dirent64 *d;
-
-			if (base.size() == 0)
-				return;
-
-			fd = openat(AT_FDCWD, base.c_str(), O_RDONLY);
-			if (fd == -1) {
-				std::ostringstream ss;
-				ss << "failed to open dir '" << base << "': " << strerror(errno);
-				throw std::runtime_error(ss.str());
-			}
-
-			dir = fdopendir(fd);
-
-			while ((d = readdir64(dir)) != NULL) {
-				if (d->d_name[0] == '.' && d->d_name[1] == '\0')
-					continue;
-				if (d->d_name[0] == '.' && d->d_name[1] == '.' && d->d_name[2] == '\0')
-					continue;
-
-				if (d->d_type != DT_DIR) {
-					m_charset_detector.load_file((base + "/" + d->d_name).c_str(), d->d_name);
-				}
-			}
-			close(fd);
+			wookie::iterate_directory(base, std::bind(&wookie::ngram::detector::load_file, &m_charset_detector,
+						std::placeholders::_1, std::placeholders::_2));
 		}
 
 		bool feed(const char *path) {
