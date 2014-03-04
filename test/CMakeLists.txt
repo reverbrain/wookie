@@ -34,8 +34,6 @@ target_link_libraries(wookie_data_iterator
 	-pthread
 )
 
-add_subdirectory(similarity)
-
 add_executable(wookie_swarm_download swarm.cpp)
 target_link_libraries(wookie_swarm_download
 	${Boost_LIBRARIES}
@@ -43,3 +41,10 @@ target_link_libraries(wookie_swarm_download
 	${SWARM_LIBRARIES}
 	${SWARM_URLFETCHER_LIBRARIES}
 )
+
+add_executable(wookie_encoding encoding.cpp)
+target_link_libraries(wookie_encoding
+	${Boost_LIBRARIES}
+)
+
+add_subdirectory(similarity)
