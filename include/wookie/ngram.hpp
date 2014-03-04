@@ -107,7 +107,7 @@ class probability {
 	public:
 		probability() : m_n2(2), m_n3(3) {}
 
-		void load_file(const char *filename) {
+		bool load_file(const char *filename) {
 			std::ifstream in(filename, std::ios::binary);
 			std::ostringstream ss;
 			ss << in.rdbuf();
@@ -120,6 +120,7 @@ class probability {
 			printf("%s: loaded: %zd bytes, 2-grams: %zd, 3-grams: %zd\n",
 					filename, text.size(), m_n2.num(), m_n3.num());
 #endif
+			return true;
 		}
 
 		double detect(const std::string &text) const {
@@ -142,11 +143,13 @@ class detector {
 	public:
 		detector() {}
 
-		void load_file(const char *filename, const char *id) {
+		bool load_file(const char *filename, const char *id) {
 			probability p;
-			p.load_file(filename);
+			bool ret = p.load_file(filename);
+			if (ret)
+				n_prob[id] = p;
 
-			n_prob[id] = p;
+			return ret;
 		}
 
 		std::string detect(const std::string &text) const {
