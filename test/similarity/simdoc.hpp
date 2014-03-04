@@ -2,6 +2,7 @@
 #define __ELLIPTICS_SIMDOC_HPP
 
 #include "wookie/tfidf.hpp"
+#include "wookie/parser.hpp"
 
 #include "elliptics/session.hpp"
 
@@ -13,13 +14,6 @@
 
 namespace ioremap { namespace similarity {
 
-typedef long ngram;
-
-#define NGRAM_NUM	4
-#if NGRAM_NUM > 8 / 2
-#error "NGRAM_NUM doesn't fit long with 2-byte charset"
-#endif
-
 struct simdoc {
 	enum {
 		version = 1,
@@ -28,7 +22,7 @@ struct simdoc {
 	int id;
 	std::string name;
 	std::string text;
-	std::vector<ngram> ngrams;
+	std::vector<wookie::lngram> ngrams;
 
 	wookie::tfidf::tf tf;
 

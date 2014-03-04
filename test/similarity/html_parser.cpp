@@ -61,7 +61,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	document_parser parser;
+	document_parser tfidf;
+	wookie::parser parser;
 
 	if (enc_dir.size())
 		parser.load_encodings(enc_dir);
@@ -73,19 +74,19 @@ int main(int argc, char *argv[])
 			std::cout << "================================" << std::endl;
 			std::cout << f << std::endl;
 
-			if (!parser.feed(f.c_str())) {
-				std::cout << "NOT A TEXT" << std::endl;
-				continue;
-			}
+			parser.feed_file(f.c_str());
 
 			simdoc doc;
 
 			doc.name = f;
-			doc.text = parser.text(vm.count("tokenize") != 0);
+			if (vm.count("tokenize"))
+				doc.text = parser.string_tokens(" ");
+			else
+				doc.text = parser.text(" ");
 
 			std::cout << doc.text << std::endl;
 			parser.generate_ngrams(doc.text, doc.ngrams);
-			parser.update_tfidf(doc.text, doc.tf);
+			tfidf.update_tfidf(doc.text, doc.tf);
 
 			documents.emplace_back(doc);
 		} catch (const std::exception &e) {
@@ -96,7 +97,7 @@ int main(int argc, char *argv[])
 	if (word_freq_num != 0) {
 		for (auto doc = documents.begin(); doc != documents.end(); ++doc) {
 			printf("%s: TF-IDF (%zd)\n", doc->name.c_str(), word_freq_num);
-			auto ret = parser.top(doc->tf, word_freq_num);
+			auto ret = tfidf.top(doc->tf, word_freq_num);
 			for (auto it = ret.begin(); it != ret.end(); ++it) {
 				printf("  %s : %F\n", it->word.c_str(), it->freq);
 			}
@@ -105,8 +106,8 @@ int main(int argc, char *argv[])
 
 	if (documents.size() >= 2) {
 		for (auto fit = documents.begin(), sit = fit + 1; sit != documents.end(); ++fit, ++sit) {
-			const std::vector<ngram> &f = fit->ngrams;
-			const std::vector<ngram> &s = sit->ngrams;
+			const std::vector<wookie::lngram> &f = fit->ngrams;
+			const std::vector<wookie::lngram> &s = sit->ngrams;
 
 			printf("ngrams intersect: size: %zd vs %zd: ", f.size(), s.size());
 			auto tmp = intersect(f, s);

@@ -2,6 +2,8 @@
 #include "similarity.hpp"
 #include "simdoc.hpp"
 
+#include "wookie/lexical_cast.hpp"
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -149,7 +151,8 @@ class loader {
 			int id;
 			int step;
 
-			document_parser parser;
+			wookie::parser parser;
+			document_parser tfidf;
 
 			std::atomic_int pending;
 			std::mutex lock;
@@ -168,12 +171,11 @@ class loader {
 				std::string doc_id_str = lexical_cast(doc.id);
 				std::string file = m_input_dir + doc_id_str + ".html";
 				try {
-					if (!dth->parser.feed(file.c_str()))
-						continue;
+					dth->parser.feed_file(file.c_str());
 
 					doc.name = file;
-					doc.text = dth->parser.text(true);
-					dth->parser.update_tfidf(doc.text, doc.tf);
+					doc.text = dth->parser.string_tokens(" ");
+					dth->tfidf.update_tfidf(doc.text, doc.tf);
 					dth->parser.generate_ngrams(doc.text, doc.ngrams);
 
 					if (m_normalize_url.empty()) {
@@ -216,7 +218,7 @@ class loader {
 					reply_doc.id, reply_doc.text.size());
 
 			dth->parser.generate_ngrams(reply_doc.text, reply_doc.ngrams);
-			dth->parser.update_tfidf(reply_doc.text, reply_doc.tf);
+			dth->tfidf.update_tfidf(reply_doc.text, reply_doc.tf);
 			pack_and_send(dth, reply_doc, key);
 		}
 
@@ -351,7 +353,7 @@ class loader {
 
 			for (int i = 0; i < cpunum; ++i) {
 				threads[i].join();
-				dths[i]->parser.merge_into(df);
+				dths[i]->tfidf.merge_into(df);
 			}
 
 			threads.clear();

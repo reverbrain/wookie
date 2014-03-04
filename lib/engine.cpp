@@ -19,51 +19,17 @@
 #include "wookie/dmanager.hpp"
 #include "wookie/parser.hpp"
 #include "wookie/lexical_cast.hpp"
+#include "wookie/url.hpp"
 
 #include <mutex>
-#include <magic.h>
 
 namespace ioremap { namespace wookie {
-
-class magic_data {
-	public:
-		magic_data() {
-			magic = magic_open(MAGIC_MIME);
-			if (!magic)
-				ioremap::elliptics::throw_error(-ENOMEM, "Failed to create MIME magic handler");
-
-			if (magic_load(magic, 0) == -1) {
-				magic_close(magic);
-				ioremap::elliptics::throw_error(-ENOMEM, "Failed to load MIME magic database");
-			}
-		}
-
-		~magic_data() {
-			magic_close(magic);
-		}
-
-		const char *type(const char *buffer, size_t size) {
-			const char *ret = magic_buffer(magic, buffer, size);
-
-			if (!ret)
-				ret = "none";
-
-			return ret;
-		}
-
-		bool is_text(const char *buffer, size_t size) {
-			return !strncmp(type(buffer, size), "text/", 5);
-		}
-
-	private:
-		magic_t magic;
-};
 
 filter_functor create_text_filter()
 {
 	struct filter
 	{
-		magic_data magic;
+		wookie::magic magic;
 
 		bool check(const swarm::url_fetcher::response &reply, const std::string &data)
 		{
@@ -132,7 +98,7 @@ parser_functor create_href_parser()
 			(void) reply;
 
 			wookie::parser p;
-			p.parse(data);
+			p.feed_text(data);
 
 			return p.urls();
 		}
@@ -158,7 +124,7 @@ public:
 	std::map<std::string, document> inflight;
 
 	std::atomic_long total;
-	magic_data magic;
+	wookie::magic magic;
 
 	struct dnet_time generation_time;
 

@@ -34,11 +34,11 @@ class magic {
 		magic() {
 			m_magic = magic_open(MAGIC_MIME);
 			if (!m_magic)
-				ioremap::elliptics::throw_error(-ENOMEM, "Failed to create MIME magic handler");
+				throw std::runtime_error("Failed to create MIME magic handler");
 
 			if (magic_load(m_magic, 0) == -1) {
 				magic_close(m_magic);
-				ioremap::elliptics::throw_error(-ENOMEM, "Failed to load MIME magic database");
+				throw std::runtime_error("Failed to load MIME magic database");
 			}
 		}
 

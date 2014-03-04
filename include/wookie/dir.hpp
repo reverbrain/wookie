@@ -17,8 +17,9 @@
 #ifndef __WOOKIE_DIR_HPP
 #define __WOOKIE_DIR_HPP
 
+#include <functional>
+#include <sstream>
 #include <string>
-
 
 #include <sys/types.h>
 #include <sys/stat.h>
