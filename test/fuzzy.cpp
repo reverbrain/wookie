@@ -7,6 +7,11 @@
 
 #include <boost/locale.hpp>
 #include <boost/program_options.hpp>
+#include <boost/locale/util.hpp>
+
+static const boost::locale::generator __fuzzy_locale_generator;
+static const std::locale __fuzzy_locale(__fuzzy_locale_generator("en_US.UTF8"));
+static const auto __fuzzy_utf8_converter = boost::locale::util::create_utf8_converter();
 
 struct letter {
 	unsigned int	l;
@@ -19,14 +24,16 @@ struct letter {
 
 	std::string str() const {
 		char tmp[8];
-		snprintf(tmp, sizeof(tmp), "0x%x", l);
+		memset(tmp, 0, sizeof(tmp));
+		__fuzzy_utf8_converter->from_unicode(l, tmp, tmp + 8);
+
 		return tmp;
 	}
 };
 
 inline std::ostream &operator <<(std::ostream &out, const letter &l)
 {
-	out << l.l;
+	out << l.str();
 	return out;
 }
 
@@ -122,22 +129,18 @@ struct letter_traits {
 class lstring : public std::basic_string<letter, letter_traits> {
 	public:
 		lstring(const char *text, size_t size) {
-			boost::locale::generator gen;
-			std::locale loc1(gen("en_US.UTF8"));
-			std::locale loc("en_US.UTF-8");
 
 			namespace lb = boost::locale::boundary;
 			std::string::const_iterator begin(text);
 			std::string::const_iterator end(text + size);
-			lb::ssegment_index wmap(lb::character, begin, end, loc);
-			wmap.rule(lb::character_any);
 
-			auto conv = boost::locale::util::create_utf8_converter();
+			lb::ssegment_index wmap(lb::character, begin, end, __fuzzy_locale);
+			wmap.rule(lb::character_any);
 
 			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
 				std::string str = it->str();
 				const char *ptr = str.c_str();
-				auto code = conv->to_unicode(ptr, ptr + str.size());
+				auto code = __fuzzy_utf8_converter->to_unicode(ptr, ptr + str.size());
 
 				letter l(code);
 				std::basic_string<letter, letter_traits>::append(&l, 1);
@@ -147,7 +150,7 @@ class lstring : public std::basic_string<letter, letter_traits> {
 		lstring(const std::string &text) : lstring(text.c_str(), text.size()) {
 		}
 
-		lstring &append(const std::string &text) {
+		lstring &append1(const std::string &text) {
 			lstring tmp(text);
 			std::basic_string<letter, letter_traits>::append(tmp);
 		}
@@ -160,19 +163,23 @@ class lstring : public std::basic_string<letter, letter_traits> {
 	private:
 };
 
-class lstreambuf : public std::basic_streambuf<letter, letter_traits> {
-
-};
+inline std::ostream &operator <<(std::ostream &out, const lstring &ls)
+{
+	for (auto it = ls.begin(); it != ls.end(); ++it) {
+		out << *it;
+	}
+	return out;
+}
 
 int main(int argc, char *argv[])
 {
 	lstring ls("это текст");
-	std::cout << "size: " << ls.size() << std::endl;
-	for (auto it = ls.begin(); it != ls.end(); ++it) {
-		std::cout << it->str() << std::endl;
-	}
-
+	ls.append(lstring("qwe"));
 
 	size_t pos = ls.find("те");
 	std::cout << pos << std::endl;
+
+	std::cout << ls << std::endl;
+
+	return 0;
 }
