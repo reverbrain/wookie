@@ -27,22 +27,23 @@
 #include <math.h>
 
 namespace ioremap { namespace wookie { namespace ngram {
-
+template <typename S>
 struct ncount {
-	std::string	word;
-	int		count;
+	S	word;
+	int	count;
 };
 
-class byte_ngram {
+template <typename S>
+class ngram {
 	public:
-		byte_ngram(int n) : m_n(n) {}
+		ngram(int n) : m_n(n) {}
 
-		static std::vector<std::string> split(const std::string &text, size_t ngram) {
-			std::vector<std::string> ret;
+		static std::vector<S> split(const S &text, size_t ngram) {
+			std::vector<S> ret;
 
 			if (text.size() >= ngram) {
 				for (size_t i = 0; i < text.size() - ngram + 1; ++i) {
-					std::string word = text.substr(i, ngram);
+					S word = text.substr(i, ngram);
 					ret.emplace_back(word);
 				}
 			}
@@ -50,8 +51,8 @@ class byte_ngram {
 			return ret;
 		}
 
-		void load(const std::string &text) {
-			std::vector<std::string> grams = byte_ngram::split(text, m_n);
+		void load(const S &text) {
+			std::vector<S> grams = ngram<S>::split(text, m_n);
 			for (auto word = grams.begin(); word != grams.end(); ++word) {
 				auto it = m_map.find(*word);
 				if (it == m_map.end())
@@ -63,7 +64,7 @@ class byte_ngram {
 			//printf("text: %zd bytes, loaded %zd %d-grams\n", text.size(), grams.size(), m_n);
 		}
 
-		void load(const std::vector<std::string> &words) {
+		void load(const std::vector<S> &words) {
 			for (auto word = words.begin(); word != words.end(); ++word) {
 				load(*word);
 			}
@@ -74,7 +75,7 @@ class byte_ngram {
 			m_vec.reserve(m_map.size());
 
 			for (auto it = m_map.begin(); it != m_map.end(); ++it) {
-				ncount nc;
+				ncount<S> nc;
 				nc.word = it->first;
 				nc.count = it->second;
 
@@ -82,7 +83,7 @@ class byte_ngram {
 			}
 		}
 
-		double lookup(const std::string &word) const {
+		double lookup(const S &word) const {
 			double count = 1.0;
 
 			auto it = m_map.find(word);
@@ -99,9 +100,11 @@ class byte_ngram {
 
 	private:
 		int m_n;
-		std::map<std::string, int> m_map;
-		std::vector<ncount> m_vec;
+		std::map<S, int> m_map;
+		std::vector<ncount<S>> m_vec;
 };
+
+typedef ngram<std::string> byte_ngram;
 
 class probability {
 	public:
