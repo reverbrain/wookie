@@ -1,3 +1,5 @@
+#include "wookie/ngram.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <list>
@@ -105,23 +107,23 @@ struct letter_traits {
 		return s;
 	}
 
-	static const char_type to_char_type(const int_type &c) {
+	static char_type to_char_type(const int_type &c) {
 		return static_cast<char_type>(c);
 	}
 
-	static const int_type to_int_type(const char_type &c) {
+	static int_type to_int_type(const char_type &c) {
 		return static_cast<int_type>(c);
 	}
 
-	static const bool eq_int_type(const int_type &c1, const int_type &c2) {
+	static bool eq_int_type(const int_type &c1, const int_type &c2) {
 		return c1.l == c2.l;
 	}
 
-	static const int_type eof() {
+	static int_type eof() {
 		return static_cast<int_type>(~0U);
 	}
 
-	static const int_type not_eof(const int_type &c) {
+	static int_type not_eof(const int_type &c) {
 		return !eq_int_type(c, eof()) ? c : to_int_type(char_type());
 	}
 };
@@ -153,6 +155,7 @@ class lstring : public std::basic_string<letter, letter_traits> {
 		lstring &append1(const std::string &text) {
 			lstring tmp(text);
 			std::basic_string<letter, letter_traits>::append(tmp);
+			return *this;
 		}
 
 		size_t find(const std::string &text) {
@@ -170,6 +173,10 @@ inline std::ostream &operator <<(std::ostream &out, const lstring &ls)
 	}
 	return out;
 }
+
+class fuzzy {
+	public:
+};
 
 int main(int argc, char *argv[])
 {
