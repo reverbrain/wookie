@@ -1,4 +1,5 @@
 #include "wookie/ngram.hpp"
+#include "wookie/parser.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -10,6 +11,8 @@
 #include <boost/locale.hpp>
 #include <boost/program_options.hpp>
 #include <boost/locale/util.hpp>
+
+using namespace ioremap;
 
 static const boost::locale::generator __fuzzy_locale_generator;
 static const std::locale __fuzzy_locale(__fuzzy_locale_generator("en_US.UTF8"));
@@ -128,43 +131,7 @@ struct letter_traits {
 	}
 };
 
-class lstring : public std::basic_string<letter, letter_traits> {
-	public:
-		lstring(const char *text, size_t size) {
-
-			namespace lb = boost::locale::boundary;
-			std::string::const_iterator begin(text);
-			std::string::const_iterator end(text + size);
-
-			lb::ssegment_index wmap(lb::character, begin, end, __fuzzy_locale);
-			wmap.rule(lb::character_any);
-
-			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-				std::string str = it->str();
-				const char *ptr = str.c_str();
-				auto code = __fuzzy_utf8_converter->to_unicode(ptr, ptr + str.size());
-
-				letter l(code);
-				std::basic_string<letter, letter_traits>::append(&l, 1);
-			}
-		}
-
-		lstring(const std::string &text) : lstring(text.c_str(), text.size()) {
-		}
-
-		lstring &append1(const std::string &text) {
-			lstring tmp(text);
-			std::basic_string<letter, letter_traits>::append(tmp);
-			return *this;
-		}
-
-		size_t find(const std::string &text) {
-			lstring tmp(text);
-			return std::basic_string<letter, letter_traits>::find(tmp);
-		}
-
-	private:
-};
+typedef std::basic_string<letter, letter_traits> lstring;
 
 inline std::ostream &operator <<(std::ostream &out, const lstring &ls)
 {
@@ -174,19 +141,146 @@ inline std::ostream &operator <<(std::ostream &out, const lstring &ls)
 	return out;
 }
 
+
+class lconvert {
+	public:
+		static lstring from_utf8(const char *text, size_t size) {
+
+			namespace lb = boost::locale::boundary;
+			std::string::const_iterator begin(text);
+			std::string::const_iterator end(text + size);
+
+			lb::ssegment_index wmap(lb::character, begin, end, __fuzzy_locale);
+			wmap.rule(lb::character_any);
+
+			lstring ret;
+
+			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+				std::string str = it->str();
+				const char *ptr = str.c_str();
+				auto code = __fuzzy_utf8_converter->to_unicode(ptr, ptr + str.size());
+
+				letter l(code);
+				ret.append(&l, 1);
+			}
+
+			return ret;
+		}
+
+		static lstring from_utf8(const std::string &text) {
+			return from_utf8(text.c_str(), text.size());
+		}
+};
+
+#define FUZZY_NGRAM_NUM	2
+
 class fuzzy {
 	public:
+		fuzzy() : m_ngram(FUZZY_NGRAM_NUM), m_converted(false) {}
+
+		void feed_text(const std::string &text) {
+			namespace lb = boost::locale::boundary;
+
+			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), __fuzzy_locale);
+			wmap.rule(lb::word_any);
+
+			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+				lstring word = lconvert::from_utf8(boost::locale::to_lower(it->str(), __fuzzy_locale));
+				m_ngram.load(word, word);
+			}
+		}
+
+		void search(const std::string &text) {
+			if (!m_converted) {
+				m_ngram.convert();
+				m_converted = true;
+			}
+
+			lstring t = lconvert::from_utf8(boost::locale::to_lower(text, __fuzzy_locale));
+			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, FUZZY_NGRAM_NUM);
+
+			std::vector<lstring> ret;
+			for (auto it = ngrams.begin(); it != ngrams.end(); ++it) {
+				auto tmp = m_ngram.lookup_word(*it);
+
+				std::cout << text << ": " << *it << ": ";
+				for (auto n = tmp.begin(); n != tmp.end(); ++n)
+					std::cout << *n << " ";
+				std::cout << std::endl;
+			}
+		}
+
+	private:
+		wookie::ngram::ngram<lstring, lstring> m_ngram;
+		bool m_converted;
 };
 
 int main(int argc, char *argv[])
 {
-	lstring ls("это текст");
-	ls.append(lstring("qwe"));
+	namespace bpo = boost::program_options;
 
-	size_t pos = ls.find("те");
-	std::cout << pos << std::endl;
+	bpo::options_description generic("Fuzzy search tool options");
+	size_t word_freq_num = 0;
 
-	std::cout << ls << std::endl;
+	std::string enc_dir;
+	generic.add_options()
+		("help", "This help message")
+		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
+		;
+
+	bpo::positional_options_description p;
+	p.add("text", 1).add("files", -1);
+
+	std::vector<std::string> files;
+	std::string text;
+
+	bpo::options_description hidden("Positional options");
+	hidden.add_options()
+		("text", bpo::value<std::string>(&text), "text to lookup")
+		("files", bpo::value<std::vector<std::string>>(&files), "files to parse")
+	;
+
+	bpo::variables_map vm;
+
+	try {
+		bpo::options_description cmdline_options;
+		cmdline_options.add(generic).add(hidden);
+
+		bpo::store(bpo::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
+		bpo::notify(vm);
+	} catch (const std::exception &e) {
+		std::cerr << "Invalid options: " << e.what() << "\n" << generic << std::endl;
+		return -1;
+	}
+
+	if (!text.size()) {
+		std::cerr << "No text to lookup\n" << generic << "\n" << hidden << std::endl;
+		return -1;
+	}
+
+	if (!files.size()) {
+		std::cerr << "No input files\n" << generic << "\n" << hidden << std::endl;
+		return -1;
+	}
+
+	try {
+		wookie::parser parser;
+		if (enc_dir.size())
+			parser.load_encodings(enc_dir);
+
+		fuzzy f;
+
+		for (auto file = files.begin(); file != files.end(); ++file) {
+			parser.feed_file(file->c_str());
+
+			f.feed_text(parser.text(" "));
+		}
+
+		f.search(text);
+	} catch (const std::exception &e) {
+		std::cerr << "Exception: " << e.what() << std::endl;
+		return -1;
+	}
 
 	return 0;
 }
