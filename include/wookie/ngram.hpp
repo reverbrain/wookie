@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -33,8 +34,15 @@ struct ncount {
 	int	count;
 };
 
-template <typename S>
+template <typename S, typename D>
 class ngram {
+	struct ngram_data {
+		std::vector<D> data;
+		int count;
+
+		ngram_data() : count(1) {}
+	};
+
 	public:
 		ngram(int n) : m_n(n) {}
 
@@ -51,23 +59,21 @@ class ngram {
 			return ret;
 		}
 
-		void load(const S &text) {
-			std::vector<S> grams = ngram<S>::split(text, m_n);
+		void load(const S &text, const D &data) {
+			std::vector<S> grams = ngram<S, D>::split(text, m_n);
 			for (auto word = grams.begin(); word != grams.end(); ++word) {
 				auto it = m_map.find(*word);
-				if (it == m_map.end())
-					m_map[*word] = 1;
-				else
-					it->second++;
+				if (it == m_map.end()) {
+					ngram_data d;
+					d.data.push_back(data);
+					m_map[*word] = d;
+				} else {
+					it->second.count++;
+					it->second.data.push_back(data);
+				}
 			}
 
 			//printf("text: %zd bytes, loaded %zd %d-grams\n", text.size(), grams.size(), m_n);
-		}
-
-		void load(const std::vector<S> &words) {
-			for (auto word = words.begin(); word != words.end(); ++word) {
-				load(*word);
-			}
 		}
 
 		void convert(void) {
@@ -77,10 +83,22 @@ class ngram {
 			for (auto it = m_map.begin(); it != m_map.end(); ++it) {
 				ncount<S> nc;
 				nc.word = it->first;
-				nc.count = it->second;
-
+				nc.count = it->second.count;
 				m_vec.emplace_back(nc);
+
+				std::set<D> tmp(it->second.data.begin(), it->second.data.end());
+				it->second.data.assign(tmp.begin(), tmp.end());
 			}
+		}
+
+		std::vector<D> lookup_word(const S &word) const {
+			std::vector<D> ret;
+
+			auto it = m_map.find(word);
+			if (it != m_map.end())
+				ret = it->second.data;
+
+			return ret;
 		}
 
 		double lookup(const S &word) const {
@@ -88,7 +106,7 @@ class ngram {
 
 			auto it = m_map.find(word);
 			if (it != m_map.end())
-				count += it->second;
+				count += it->second.count;
 
 			count /= 2.0 * m_map.size();
 			return count;
@@ -100,11 +118,11 @@ class ngram {
 
 	private:
 		int m_n;
-		std::map<S, int> m_map;
+		std::map<S, ngram_data> m_map;
 		std::vector<ncount<S>> m_vec;
 };
 
-typedef ngram<std::string> byte_ngram;
+typedef ngram<std::string, int> byte_ngram;
 
 class probability {
 	public:
@@ -117,8 +135,8 @@ class probability {
 
 			std::string text = ss.str();
 
-			m_n2.load(text);
-			m_n3.load(text);
+			m_n2.load(text, 0);
+			m_n3.load(text, 0);
 #if 0
 			printf("%s: loaded: %zd bytes, 2-grams: %zd, 3-grams: %zd\n",
 					filename, text.size(), m_n2.num(), m_n3.num());
