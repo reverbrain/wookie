@@ -120,6 +120,10 @@ class ngram {
 			return m_map.size();
 		}
 
+		int n(void) const {
+			return m_n;
+		}
+
 	private:
 		int m_n;
 		std::map<S, ngram_data> m_map;
