@@ -200,13 +200,38 @@ class fuzzy {
 			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, FUZZY_NGRAM_NUM);
 
 			std::vector<lstring> ret;
+			std::map<lstring, int> word_count;
+
 			for (auto it = ngrams.begin(); it != ngrams.end(); ++it) {
 				auto tmp = m_ngram.lookup_word(*it);
 
-				std::cout << text << ": " << *it << ": ";
-				for (auto n = tmp.begin(); n != tmp.end(); ++n)
-					std::cout << *n << " ";
-				std::cout << std::endl;
+				for (auto word = tmp.begin(); word != tmp.end(); ++word) {
+					auto wc = word_count.find(*word);
+					if (wc == word_count.end())
+						word_count[*word] = 1;
+					else
+						wc->second++;
+				}
+			}
+
+			std::vector<wookie::ngram::ncount<lstring>> counts;
+			for (auto wc = word_count.begin(); wc != word_count.end(); ++wc) {
+				wookie::ngram::ncount<lstring> nc;
+				nc.word = wc->first;
+				nc.count = wc->second;
+
+				counts.emplace_back(nc);
+			}
+
+			std::sort(counts.begin(), counts.end());
+
+			int bound = (t.size() - FUZZY_NGRAM_NUM + 1) * 2 / 3;
+			std::cout << text << ": boundary: " << bound << "\n";
+			for (auto nc = counts.rbegin(); nc != counts.rend(); ++nc) {
+				if (nc->count < bound)
+					break;
+
+				std::cout << nc->word << ": " << nc->count << std::endl;
 			}
 		}
 
