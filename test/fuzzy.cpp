@@ -172,11 +172,9 @@ class lconvert {
 		}
 };
 
-#define FUZZY_NGRAM_NUM	2
-
 class fuzzy {
 	public:
-		fuzzy() : m_ngram(FUZZY_NGRAM_NUM), m_converted(false) {}
+		fuzzy(int num) : m_ngram(num), m_converted(false) {}
 
 		void feed_text(const std::string &text) {
 			namespace lb = boost::locale::boundary;
@@ -197,7 +195,7 @@ class fuzzy {
 			}
 
 			lstring t = lconvert::from_utf8(boost::locale::to_lower(text, __fuzzy_locale));
-			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, FUZZY_NGRAM_NUM);
+			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, m_ngram.n());
 
 			std::vector<lstring> ret;
 			std::map<lstring, int> word_count;
@@ -225,7 +223,7 @@ class fuzzy {
 
 			std::sort(counts.begin(), counts.end());
 
-			int bound = (t.size() - FUZZY_NGRAM_NUM + 1) * 2 / 3;
+			int bound = (t.size() - m_ngram.n() + 1) * 2 / 3;
 			std::cout << text << ": boundary: " << bound << "\n";
 			for (auto nc = counts.rbegin(); nc != counts.rend(); ++nc) {
 				if (nc->count < bound)
@@ -245,11 +243,12 @@ int main(int argc, char *argv[])
 	namespace bpo = boost::program_options;
 
 	bpo::options_description generic("Fuzzy search tool options");
-	size_t word_freq_num = 0;
 
+	int num;
 	std::string enc_dir;
 	generic.add_options()
 		("help", "This help message")
+		("ngram", bpo::value<int>(&num)->default_value(3), "Number of symbols in each ngram")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		;
 
@@ -293,7 +292,7 @@ int main(int argc, char *argv[])
 		if (enc_dir.size())
 			parser.load_encodings(enc_dir);
 
-		fuzzy f;
+		fuzzy f(num);
 
 		for (auto file = files.begin(); file != files.end(); ++file) {
 			parser.feed_file(file->c_str());
