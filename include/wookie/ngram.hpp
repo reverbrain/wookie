@@ -31,10 +31,10 @@ namespace ioremap { namespace wookie { namespace ngram {
 template <typename S>
 struct ncount {
 	S	word;
-	int	count;
+	double	count;
 
 	bool operator<(const struct ncount &other) const {
-		return count < other.count;
+		return count >= other.count;
 	}
 };
 
@@ -42,9 +42,9 @@ template <typename S, typename D>
 class ngram {
 	struct ngram_data {
 		std::vector<D> data;
-		int count;
+		double count;
 
-		ngram_data() : count(1) {}
+		ngram_data() : count(1.0) {}
 	};
 
 	public:
