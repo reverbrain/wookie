@@ -32,6 +32,10 @@ template <typename S>
 struct ncount {
 	S	word;
 	int	count;
+
+	bool operator<(const struct ncount &other) const {
+		return count < other.count;
+	}
 };
 
 template <typename S, typename D>
