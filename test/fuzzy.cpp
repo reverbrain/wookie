@@ -188,7 +188,7 @@ class fuzzy {
 			}
 		}
 
-		void search(const std::string &text) {
+		std::vector<wookie::ngram::ncount<lstring>> search(const std::string &text, size_t max) {
 			if (!m_converted) {
 				m_ngram.convert();
 				m_converted = true;
@@ -197,7 +197,6 @@ class fuzzy {
 			lstring t = lconvert::from_utf8(boost::locale::to_lower(text, __fuzzy_locale));
 			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, m_ngram.n());
 
-			std::vector<lstring> ret;
 			std::map<lstring, int> word_count;
 
 			for (auto it = ngrams.begin(); it != ngrams.end(); ++it) {
@@ -216,21 +215,21 @@ class fuzzy {
 			for (auto wc = word_count.begin(); wc != word_count.end(); ++wc) {
 				wookie::ngram::ncount<lstring> nc;
 				nc.word = wc->first;
-				nc.count = wc->second;
+				nc.count = (double)wc->second / (double)wc->first.size();
 
 				counts.emplace_back(nc);
 			}
 
 			std::sort(counts.begin(), counts.end());
+			if (max < counts.size())
+				counts.resize(max);
 
-			int bound = (t.size() - m_ngram.n() + 1) * 2 / 3;
-			std::cout << text << ": boundary: " << bound << "\n";
-			for (auto nc = counts.rbegin(); nc != counts.rend(); ++nc) {
-				if (nc->count < bound)
-					break;
-
+			std::cout << text << "\n";
+			for (auto nc = counts.begin(); nc != counts.end(); ++nc) {
 				std::cout << nc->word << ": " << nc->count << std::endl;
 			}
+
+			return counts;
 		}
 
 	private:
@@ -300,7 +299,7 @@ int main(int argc, char *argv[])
 			f.feed_text(parser.text(" "));
 		}
 
-		f.search(text);
+		f.search(text, 3);
 	} catch (const std::exception &e) {
 		std::cerr << "Exception: " << e.what() << std::endl;
 		return -1;
