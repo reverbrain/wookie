@@ -39,8 +39,8 @@ struct rindex_processor
 
 	basic_elliptics_splitter m_splitter;
 
-	rindex_processor(wookie::engine &engine, const std::string &base, bool fallback, const std::string &lex_path)
-		: engine(engine), base(base), fallback(fallback), m_splitter(lex_path) {
+	rindex_processor(wookie::engine &engine, const std::string &base, bool fallback)
+		: engine(engine), base(base), fallback(fallback) {
 	}
 
 	void process(const std::string &url, const std::string &content,
@@ -88,8 +88,7 @@ struct rindex_processor
 		}
 	}
 
-	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback,
-			const std::string &lex_path) {
+	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback) {
 		ioremap::swarm::url base_url = url;
 		if (!base_url.is_valid())
 			ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': set-base failed", url.c_str());
@@ -99,7 +98,7 @@ struct rindex_processor
 			ioremap::elliptics::throw_error(-EINVAL, "Invalid URL '%s': base is empty", url.c_str());
 
 		return std::bind(&rindex_processor::process_text,
-			std::make_shared<rindex_processor>(engine, base, fallback, lex_path),
+			std::make_shared<rindex_processor>(engine, base, fallback),
 			std::placeholders::_1,
 			std::placeholders::_2,
 			std::placeholders::_3);
@@ -137,15 +136,14 @@ int main(int argc, char *argv[])
 
 	std::string find;
 	std::string url;
-	std::string lex_path;
 	variables_map vm;
 	wookie::engine engine;
 
 	engine.add_options("RIndex options")
-		("find", value<std::string>(&find), "Find pages containing all tokens (space separated, supports quotes for exact match)")
+		("find", value<std::string>(&find),
+		 	"Find pages containing all tokens (space separated, supports quotes for exact match)")
 		("url", value<std::string>(&url), "Url to download")
 		("json", "Output json with pages content which contain requested tokens")
-		("msgpack-lexer-path", value<std::string>(&lex_path), "Path to Zaliznyak dictionary in msgpacked form")
 	;
 
 	try {
@@ -226,8 +224,8 @@ int main(int argc, char *argv[])
 			engine.add_url_filter(create_words_filter(forbidden_words));
 			engine.add_url_filter(create_port_filter(allowed_ports));
 			engine.add_parser(create_href_parser());
-			engine.add_processor(rindex_processor::create(engine, url, false, lex_path));
-			engine.add_fallback_processor(rindex_processor::create(engine, url, true, ""));
+			engine.add_processor(rindex_processor::create(engine, url, false));
+			engine.add_fallback_processor(rindex_processor::create(engine, url, true));
 
 			engine.download(url);
 

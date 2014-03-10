@@ -19,7 +19,6 @@
 
 #include "wookie/dir.hpp"
 #include "wookie/iconv.hpp"
-#include "wookie/ngram.hpp"
 #include "wookie/tfidf.hpp"
 #include "wookie/url.hpp"
 
@@ -40,6 +39,8 @@
 
 #include <boost/locale.hpp>
 
+#include <warp/ngram.hpp>
+
 namespace ioremap { namespace wookie {
 
 typedef long lngram;
@@ -58,7 +59,7 @@ class parser {
 		}
 
 		void load_encodings(const std::string &base) {
-			wookie::iterate_directory(base, std::bind(&wookie::ngram::detector::load_file, &m_charset_detector,
+			wookie::iterate_directory(base, std::bind(&warp::ngram::detector::load_file, &m_charset_detector,
 						std::placeholders::_1, std::placeholders::_2));
 		}
 
@@ -213,7 +214,7 @@ class parser {
 		std::vector<std::string> m_urls;
 		std::vector<std::string> m_tokens;
 
-		wookie::ngram::detector m_charset_detector;
+		warp::ngram::detector m_charset_detector;
 		boost::locale::generator m_gen;
 		std::locale m_loc;
 		magic m_magic;

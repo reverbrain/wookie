@@ -47,12 +47,4 @@ target_link_libraries(wookie_encoding
 	${Boost_LIBRARIES}
 )
 
-add_executable(wookie_fuzzy fuzzy.cpp)
-target_link_libraries(wookie_fuzzy
-	${Boost_LIBRARIES}
-	${LIBTIDY_LIBRARIES}
-	${LIBMAGIC_LIBRARIES}
-	${MSGPACK_LIBRARIES}
-)
-
 add_subdirectory(similarity)

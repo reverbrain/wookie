@@ -25,8 +25,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/locale.hpp>
 
-#include <warp/lex.hpp>
-
 #include <stem/stem.hpp>
 
 namespace ioremap { namespace wookie {
@@ -36,15 +34,10 @@ typedef std::map<std::string, boost::shared_ptr<stem> > mstem_t;
 
 class split {
 	public:
-		split() : m_loc(m_gen("en_US.UTF8")), m_lex(m_loc), m_lex_loaded(false) {}
-		split(const std::string &path) : split() {
-			if (path.size()) {
-				m_lex.load(path);
-				m_lex_loaded = true;
-			}
-		}
+		split() : m_loc(m_gen("en_US.UTF8")) {}
 
 		mpos_t feed(const std::string &text, std::vector<std::string> &tokens) {
+			namespace lb = boost::locale::boundary;
 			lb::ssegment_index wmap(lb::word, text.begin(), text.end(), m_loc);
 			wmap.rule(lb::word_any);
 
@@ -55,21 +48,16 @@ class split {
 			for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
 				std::string token = boost::locale::to_lower(it->str(), m_loc);
 
-				std::string tmp = m_lex.root(token);
-				if (tmp.size()) {
-					token = tmp;
+				wookie::lang_detect ld(token.data(), token.size());
+
+				mstem_t::iterator stem_it = stems.find(ld.lang());
+				if (stem_it == stems.end()) {
+					boost::shared_ptr<stem> st(new stem(ld.lang(), NULL));
+					stems.insert(std::make_pair(ld.lang(), st));
+
+					token = st->get(token.data(), token.size());
 				} else {
-					wookie::lang_detect ld(token.data(), token.size());
-
-					mstem_t::iterator stem_it = stems.find(ld.lang());
-					if (stem_it == stems.end()) {
-						boost::shared_ptr<stem> st(new stem(ld.lang(), NULL));
-						stems.insert(std::make_pair(ld.lang(), st));
-
-						token = st->get(token.data(), token.size());
-					} else {
-						token = stem_it->second->get(token.data(), token.size());
-					}
+					token = stem_it->second->get(token.data(), token.size());
 				}
 
 				if (token.size()) {
@@ -95,8 +83,6 @@ class split {
 		static const std::string m_split_string;
 		boost::locale::generator m_gen;
 		std::locale m_loc;
-		ioremap::warp::lex m_lex;
-		bool m_lex_loaded;
 };
 
 }}

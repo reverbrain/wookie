@@ -1,4 +1,4 @@
-#include "wookie/ngram.hpp"
+#include "warp/ngram.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -46,12 +46,13 @@ int main(int argc, char *argv[])
 	}
 
 	if (!files.size()) {
-		std::cerr << "You must provide input files for different languages/encodings for statistics\n" << generic << std::endl;
+		std::cerr << "You must provide input files for different languages/encodings for statistics\n" <<
+			generic << std::endl;
 		return -1;
 	}
 
 	try {
-		wookie::ngram::detector d;
+		warp::ngram::detector d;
 
 		for (auto f = files.begin(); f != files.end(); ++f)
 			d.load_file(f->c_str(), f->c_str());

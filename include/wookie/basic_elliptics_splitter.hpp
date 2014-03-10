@@ -28,7 +28,6 @@ namespace ioremap { namespace wookie {
 class basic_elliptics_splitter {
 	public:
 		basic_elliptics_splitter() {}
-		basic_elliptics_splitter(const std::string &path) : m_splitter(path) {}
 		~basic_elliptics_splitter();
 
 		void process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
