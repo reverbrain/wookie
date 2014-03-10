@@ -95,15 +95,15 @@ class dmanager {
 
 		void feed(const swarm::url &url, const ioremap::swarm::simple_stream::handler_func &handler) {
 			ioremap::swarm::url_fetcher::request request;
-            request.set_follow_location(true);
-            request.set_url(url);
+			request.set_follow_location(true);
+			request.set_url(url);
 			m_downloaders[rand() % m_downloaders.size()].enqueue(std::move(request), handler);
 		}
 
 		void feed(const swarm::url &url, const document &doc, const ioremap::swarm::simple_stream::handler_func &handler) {
 			ioremap::swarm::url_fetcher::request request;
-            request.set_follow_location(true);
-            request.set_url(url);
+			request.set_follow_location(true);
+			request.set_url(url);
 			request.headers().set_if_modified_since(doc.ts.tsec);
 
 			m_downloaders[rand() % m_downloaders.size()].enqueue(std::move(request), handler);

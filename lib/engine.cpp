@@ -23,6 +23,8 @@
 
 #include <mutex>
 
+#include <boost/algorithm/string.hpp>
+
 namespace ioremap { namespace wookie {
 
 filter_functor create_text_filter()

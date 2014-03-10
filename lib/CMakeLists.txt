@@ -2,12 +2,9 @@ aux_source_directory(. WOOKIE_SRC_LIST)
 add_library(wookie SHARED ${WOOKIE_SRC_LIST})
 
 target_link_libraries(wookie
-	wookie_stem
 	${Boost_PROGRAM_OPTIONS_LIBRARY}
 	${Boost_LOCALE_LIBRARY}
 	${elliptics_cpp_LIBRARY}
-	${cld_LIBRARIES}
-	${LIBEV_LIBRARIES}
 	${SWARM_LIBRARIES}
 	${SWARM_XML_LIBRARIES}
 	${SWARM_URLFETCHER_LIBRARIES}

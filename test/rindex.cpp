@@ -48,7 +48,7 @@ struct rindex_processor
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
-		m_splitter.process(url, content, ts, base_index, ids, objs);
+		m_splitter.prepare_indexes(url, content, ts, base_index, ids, objs);
 
 		if (ids.size()) {
 			std::cout << "Rindex update ... url: " << url << ": indexes: " << ids.size() << std::endl;

@@ -25,18 +25,30 @@
 
 namespace ioremap { namespace wookie {
 
+// this class splits text into tokens with their positions using @wookie::split
+// and then creates array of secondary (reverse) indexes and their index data
+// in particular, ids/objs array contains list of reverse indexes where
+// @ids contains index IDs (like token names) and @objs array contains set of
+// @index_data objects associated with every reverse index
+//
+// These arrays may also include base index, i.e. some ${prefix}.collection name,
+// where all downloaded pages are stored
+//
+// To date it doesn't perform any lexical processing like text normalization, lemmatization or stemming
+// This will be done in WARP project and accessible as a service with async API
 class basic_elliptics_splitter {
 	public:
 		basic_elliptics_splitter() {}
-		~basic_elliptics_splitter();
+		~basic_elliptics_splitter() {}
 
-		void process(const wookie::document &doc, const std::string &base_index, std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
-		void process(const std::string &key, const std::string &content, const dnet_time &ts, const std::string &base_index,
+		void prepare_indexes(const wookie::document &doc, const std::string &base_index,
+				std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
+		void prepare_indexes(const std::string &key, const std::string &content,
+				const dnet_time &ts, const std::string &base_index,
 				std::vector<std::string> &ids, std::vector<elliptics::data_pointer> &objs);
 
 	private:
 		wookie::split m_splitter;
-		std::map<std::string, std::atomic_int> m_tokens;
 };
 
 }} // namespace ioremap::wookie

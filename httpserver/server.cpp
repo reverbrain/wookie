@@ -87,7 +87,7 @@ struct on_upload : public rift::io::on_upload<T>
 		std::vector<std::string> ids;
 		std::vector<elliptics::data_pointer> objs;
 
-		this->server()->get_splitter().process(m_doc, m_base_index, ids, objs);
+		this->server()->get_splitter().prepare_indexes(m_doc, m_base_index, ids, objs);
 
 		if (ids.size()) {
 			rift::io::upload_completion::fill_upload_reply(result, m_result_object,

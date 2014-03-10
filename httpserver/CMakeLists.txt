@@ -1,7 +1,6 @@
 add_executable(wookie_http server.cpp)
 target_link_libraries(wookie_http
 	wookie
-	wookie_stem
 	${MSGPACK_LIBRARIES}
 	${THEVOID_LIBRARIES}
 	${RIFT_LIBRARIES}

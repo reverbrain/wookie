@@ -28,6 +28,10 @@
 
 namespace ioremap { namespace wookie {
 
+// index_data class stores additional info for every object (downloaded document) tagged by given index
+// @ts - document download/index update time
+// @key - index token name - it is stored in elliptics as 64-bit ID, this field allows to grab the name
+// @pos - array of token positions where given index token was found
 struct index_data {
 	dnet_time ts;
 	std::string key;
