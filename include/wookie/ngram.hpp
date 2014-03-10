@@ -76,23 +76,6 @@ class ngram {
 					it->second.data.push_back(data);
 				}
 			}
-
-			//printf("text: %zd bytes, loaded %zd %d-grams\n", text.size(), grams.size(), m_n);
-		}
-
-		void convert(void) {
-			m_vec.clear();
-			m_vec.reserve(m_map.size());
-
-			for (auto it = m_map.begin(); it != m_map.end(); ++it) {
-				ncount<S> nc;
-				nc.word = it->first;
-				nc.count = it->second.count;
-				m_vec.emplace_back(nc);
-
-				std::set<D> tmp(it->second.data.begin(), it->second.data.end());
-				it->second.data.assign(tmp.begin(), tmp.end());
-			}
 		}
 
 		std::vector<D> lookup_word(const S &word) const {
@@ -127,7 +110,6 @@ class ngram {
 	private:
 		int m_n;
 		std::map<S, ngram_data> m_map;
-		std::vector<ncount<S>> m_vec;
 };
 
 typedef ngram<std::string, int> byte_ngram;
