@@ -1,5 +1,8 @@
 #include "wookie/ngram.hpp"
 #include "wookie/parser.hpp"
+#include "wookie/timer.hpp"
+
+#include "warp/pack.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -18,6 +21,8 @@ static const boost::locale::generator __fuzzy_locale_generator;
 static const std::locale __fuzzy_locale(__fuzzy_locale_generator("en_US.UTF8"));
 static const auto __fuzzy_utf8_converter = boost::locale::util::create_utf8_converter();
 
+#define LOAD_ROOTS
+
 struct letter {
 	unsigned int	l;
 
@@ -33,6 +38,10 @@ struct letter {
 		__fuzzy_utf8_converter->from_unicode(l, tmp, tmp + 8);
 
 		return tmp;
+	}
+
+	bool operator==(const letter &other) const {
+		return l == other.l;
 	}
 };
 
@@ -145,7 +154,6 @@ inline std::ostream &operator <<(std::ostream &out, const lstring &ls)
 class lconvert {
 	public:
 		static lstring from_utf8(const char *text, size_t size) {
-
 			namespace lb = boost::locale::boundary;
 			std::string::const_iterator begin(text);
 			std::string::const_iterator end(text + size);
@@ -170,11 +178,17 @@ class lconvert {
 		static lstring from_utf8(const std::string &text) {
 			return from_utf8(text.c_str(), text.size());
 		}
+
+		static std::string to_string(const lstring &l) {
+			std::ostringstream ss;
+			ss << l;
+			return ss.str();
+		}
 };
 
 class fuzzy {
 	public:
-		fuzzy(int num) : m_ngram(num), m_converted(false) {}
+		fuzzy(int num) : m_ngram(num) {}
 
 		void feed_text(const std::string &text) {
 			namespace lb = boost::locale::boundary;
@@ -188,14 +202,17 @@ class fuzzy {
 			}
 		}
 
-		std::vector<wookie::ngram::ncount<lstring>> search(const std::string &text, size_t max) {
-			if (!m_converted) {
-				m_ngram.convert();
-				m_converted = true;
-			}
+		void feed_word(const lstring &word) {
+			m_ngram.load(word, word);
+		}
 
+		std::vector<wookie::ngram::ncount<lstring>> search(const std::string &text) {
 			lstring t = lconvert::from_utf8(boost::locale::to_lower(text, __fuzzy_locale));
-			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(t, m_ngram.n());
+			return search(t);
+		}
+
+		std::vector<wookie::ngram::ncount<lstring>> search(const lstring &text) {
+			auto ngrams = wookie::ngram::ngram<lstring, lstring>::split(text, m_ngram.n());
 
 			std::map<lstring, int> word_count;
 
@@ -217,24 +234,189 @@ class fuzzy {
 				nc.word = wc->first;
 				nc.count = (double)wc->second / (double)wc->first.size();
 
-				counts.emplace_back(nc);
+				if (nc.count > 0.01)
+					counts.emplace_back(nc);
 			}
 
 			std::sort(counts.begin(), counts.end());
-			if (max < counts.size())
-				counts.resize(max);
-
+#if 0
 			std::cout << text << "\n";
 			for (auto nc = counts.begin(); nc != counts.end(); ++nc) {
 				std::cout << nc->word << ": " << nc->count << std::endl;
 			}
-
+#endif
 			return counts;
 		}
 
 	private:
 		wookie::ngram::ngram<lstring, lstring> m_ngram;
-		bool m_converted;
+};
+
+class spell {
+	public:
+		spell(int ngram, const std::string &path) : m_fuzzy(ngram) {
+			wookie::timer tm;
+
+			warp::unpacker unpack(path);
+#ifdef LOAD_ROOTS
+			unpack.unpack(std::bind(&spell::unpack_roots, this, std::placeholders::_1));
+#else
+			unpack.unpack(std::bind(&spell::unpack_everything, this, std::placeholders::_1));
+#endif
+
+			printf("spell checker loaded: words: %zd, time: %lld ms\n",
+					m_fe.size(), (unsigned long long)tm.elapsed());
+		}
+
+		std::vector<lstring> search(const std::string &text) {
+			wookie::timer tm;
+
+			lstring t = lconvert::from_utf8(boost::locale::to_lower(text, __fuzzy_locale));
+			auto fsearch = m_fuzzy.search(t);
+
+			printf("spell checker lookup: rough search: words: %zd, fuzzy-search-time: %lld ms\n",
+					fsearch.size(), (unsigned long long)tm.elapsed());
+
+			std::vector<lstring> ret;
+
+#ifdef LOAD_ROOTS
+			ret = search_roots(t, fsearch);
+#else
+			ret = search_everything(t, fsearch);
+#endif
+
+			printf("spell checker lookup: checked: words: %zd, total-search-time: %lld ms:\n",
+					ret.size(), (unsigned long long)tm.restart());
+
+			for (auto r = ret.begin(); r != ret.end(); ++r)
+				std::cout << *r << std::endl;
+			return ret;
+		}
+
+	private:
+		std::map<lstring, std::vector<warp::feature_ending>> m_fe;
+		fuzzy m_fuzzy;
+
+		bool unpack_roots(const warp::entry &e) {
+			lstring tmp = lconvert::from_utf8(e.root);
+			m_fe[tmp] = e.fe;
+			m_fuzzy.feed_word(tmp);
+			return true;
+		}
+
+		bool unpack_everything(const warp::entry &e) {
+			for (auto f = e.fe.begin(); f != e.fe.end(); ++f) {
+				std::string word = e.root + f->ending;
+				m_fuzzy.feed_text(word);
+			}
+			return true;
+		}
+
+		std::vector<lstring> search_roots(const lstring &t, const std::vector<wookie::ngram::ncount<lstring>> &fsearch) {
+			wookie::timer tm;
+
+			std::vector<lstring> ret;
+			int min_dist = 1024;
+
+			long total_endings = 0;
+			long total_words = 0;
+
+			ret.reserve(fsearch.size() / 4);
+			for (auto w = fsearch.begin(); w != fsearch.end(); ++w) {
+				const auto & fe = m_fe.find(w->word);
+				if (fe != m_fe.end()) {
+					std::set<std::string> checked_endings;
+
+					for (auto ending = fe->second.begin(); ending != fe->second.end(); ++ending) {
+						auto tmp_end = checked_endings.find(ending->ending);
+						if (tmp_end != checked_endings.end())
+							continue;
+
+						checked_endings.insert(ending->ending);
+						lstring word = w->word + lconvert::from_utf8(ending->ending);
+
+						int dist = ldist(t, word);
+						if (dist <= min_dist) {
+							if (dist < min_dist)
+								ret.clear();
+
+							ret.emplace_back(word);
+							min_dist = dist;
+						}
+
+						total_endings++;
+					}
+					total_words++;
+				}
+			}
+
+			printf("spell checker lookup: checked endings: roots: %ld, endings: %ld, dist: %d, time: %lld ms:\n",
+					total_words, total_endings,
+					min_dist, (unsigned long long)tm.restart());
+
+			return ret;
+		}
+
+		std::vector<lstring> search_everything(const lstring &t, const std::vector<wookie::ngram::ncount<lstring>> &fsearch) {
+			std::vector<lstring> ret;
+			int min_dist = 1024;
+
+			ret.reserve(fsearch.size());
+
+			for (auto w = fsearch.begin(); w != fsearch.end(); ++w) {
+				int dist = ldist(t, w->word);
+				if (dist <= min_dist) {
+					if (dist < min_dist)
+						ret.clear();
+
+					ret.emplace_back(w->word);
+					min_dist = dist;
+				}
+			}
+
+			return ret;
+		}
+
+
+		int ldist(const lstring &s, const lstring &t) {
+			// degenerate cases
+			if (s == t)
+				return 0;
+			if (s.size() == 0)
+				return t.size();
+			if (t.size() == 0)
+				return s.size();
+
+			// create two work vectors of integer distances
+			std::vector<int> v0(t.size() + 1);
+			std::vector<int> v1(t.size() + 1);
+
+			// initialize v0 (the previous row of distances)
+			// this row is A[0][i]: edit distance for an empty s
+			// the distance is just the number of characters to delete from t
+			for (size_t i = 0; i < v0.size(); ++i)
+				v0[i] = i;
+
+			for (size_t i = 0; i < s.size(); ++i) {
+				// calculate v1 (current row distances) from the previous row v0
+
+				// first element of v1 is A[i+1][0]
+				//   edit distance is delete (i+1) chars from s to match empty t
+				v1[0] = i + 1;
+
+				// use formula to fill in the rest of the row
+				for (size_t j = 0; j < t.size(); ++j) {
+					int cost = (s[i] == t[j]) ? 0 : 1;
+					v1[j + 1] = std::min(v1[j] + 1, v0[j + 1] + 1);
+					v1[j + 1] = std::min(v1[j + 1], v0[j] + cost);
+				}
+
+				// copy v1 (current row) to v0 (previous row) for next iteration
+				v0 = v1;
+			}
+
+			return v1[t.size()];
+		}
 };
 
 int main(int argc, char *argv[])
@@ -244,10 +426,11 @@ int main(int argc, char *argv[])
 	bpo::options_description generic("Fuzzy search tool options");
 
 	int num;
-	std::string enc_dir;
+	std::string enc_dir, msgin;
 	generic.add_options()
 		("help", "This help message")
 		("ngram", bpo::value<int>(&num)->default_value(3), "Number of symbols in each ngram")
+		("msgpack-input", bpo::value<std::string>(&msgin), "Packed Zaliznyak dictionary file")
 		("encoding-dir", bpo::value<std::string>(&enc_dir), "Load encodings from given wookie directory")
 		;
 
@@ -281,25 +464,30 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (!files.size()) {
-		std::cerr << "No input files\n" << generic << "\n" << hidden << std::endl;
+	if (!files.size() && !msgin.size()) {
+		std::cerr << "There is no input files nor packed input\n" << generic << "\n" << hidden << std::endl;
 		return -1;
 	}
 
 	try {
-		wookie::parser parser;
-		if (enc_dir.size())
-			parser.load_encodings(enc_dir);
+		if (msgin.size()) {
+			spell sp(num, msgin);
+			sp.search(text);
+		} else {
+			wookie::parser parser;
+			if (enc_dir.size())
+				parser.load_encodings(enc_dir);
 
-		fuzzy f(num);
+			fuzzy f(num);
 
-		for (auto file = files.begin(); file != files.end(); ++file) {
-			parser.feed_file(file->c_str());
+			for (auto file = files.begin(); file != files.end(); ++file) {
+				parser.feed_file(file->c_str());
 
-			f.feed_text(parser.text(" "));
+				f.feed_text(parser.text(" "));
+			}
+
+			f.search(text);
 		}
-
-		f.search(text, 3);
 	} catch (const std::exception &e) {
 		std::cerr << "Exception: " << e.what() << std::endl;
 		return -1;
