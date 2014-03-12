@@ -34,14 +34,15 @@ int main(int argc, char *argv[])
 	std::string url;
 	variables_map vm;
 	bool text = false;
-	std::string msgin, gram;
+	std::string gram;
+	std::vector<std::string> msgin;
 
 	wookie::engine engine;
 
 	engine.add_options("Document reader options")
 		("url", value<std::string>(&url), "Fetch object from storage by URL")
 		("text", "Iterate over text objects, not HTML")
-		("msgpack-input", value<std::string>(&msgin), "Path to Zaliznyak dictionary in msgpacked format")
+		("msgpack-input", value<std::vector<std::string>>(&msgin)->multitoken(), "Path to Zaliznyak dictionary in msgpacked format (can be multiple files)")
 		("grammar", value<std::string>(&gram), "Grammar string suitable for ioremap::warp::parser, "
 		 "space separates single word descriptions, '-' used to separate 'negative' features: S,им,мн-сокр,кр")
 	;
