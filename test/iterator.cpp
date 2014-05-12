@@ -99,58 +99,58 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 
-		boost::locale::generator gen;
-		std::locale loc = gen("en_US.UTF8");
+//		boost::locale::generator gen;
+//		std::locale loc = gen("en_US.UTF8");
 
-		ioremap::warp::lex l(loc);
-		l.load(msgin);
+//		ioremap::warp::lex l(loc);
+//		l.load(msgin);
 
-		std::vector<std::string> tokens;
-		std::istringstream iss(gram);
-		std::copy(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), std::back_inserter<std::vector<std::string>>(tokens));
+//		std::vector<std::string> tokens;
+//		std::istringstream iss(gram);
+//		std::copy(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), std::back_inserter<std::vector<std::string>>(tokens));
 
-		std::vector<ioremap::warp::grammar> vgram = l.generate(tokens);
+//		std::vector<ioremap::warp::grammar> vgram = l.generate(tokens);
 
-		for (const auto &b : bres) {
-			wookie::document doc = wookie::storage::unpack_document(b.file());
+//		for (const auto &b : bres) {
+//			wookie::document doc = wookie::storage::unpack_document(b.file());
 
-			std::vector<std::string> sentences;
-			boost::split(sentences, doc.data, boost::is_any_of("|"));
+//			std::vector<std::string> sentences;
+//			boost::split(sentences, doc.data, boost::is_any_of("|"));
 
-			std::cout << doc << ", sentences: " << sentences.size() << std::endl;
+//			std::cout << doc << ", sentences: " << sentences.size() << std::endl;
 
-			for (auto & sent : sentences) {
-				lb::ssegment_index wmap(lb::word, sent.begin(), sent.end(), loc);
-				wmap.rule(lb::word_any);
+//			for (auto & sent : sentences) {
+//				lb::ssegment_index wmap(lb::word, sent.begin(), sent.end(), loc);
+//				wmap.rule(lb::word_any);
 
-				std::vector<std::string> words;
-				for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
-					words.push_back(boost::locale::to_lower(it->str(), loc));
-				}
+//				std::vector<std::string> words;
+//				for (auto it = wmap.begin(), e = wmap.end(); it != e; ++it) {
+//					words.push_back(boost::locale::to_lower(it->str(), loc));
+//				}
 
-				for (auto pos : l.grammar_deduction(vgram, words)) {
-					for (size_t i = 0; i < vgram.size(); ++i) {
-						std::cout << words[i + pos] << " ";
-					}
+//				for (auto pos : l.grammar_deduction(vgram, words)) {
+//					for (size_t i = 0; i < vgram.size(); ++i) {
+//						std::cout << words[i + pos] << " ";
+//					}
 
-					std::cout << std::endl;
-					for (size_t i = 0; i < vgram.size(); ++i) {
-						std::string & word = words[i + pos];
+//					std::cout << std::endl;
+//					for (size_t i = 0; i < vgram.size(); ++i) {
+//						std::string & word = words[i + pos];
 
-						auto lres = l.lookup(word);
+//						auto lres = l.lookup(word);
 
-						std::cout << "word: " << word << ": ";
-						for (auto v : lres) {
-							std::cout << v.ending_len <<
-								"," << std::hex << "0x" << v.features <<
-								" " << std::dec;
-						}
-						std::cout << std::endl;
-					}
-					std::cout << std::endl;
-				}
-			}
-		}
+//						std::cout << "word: " << word << ": ";
+//						for (auto v : lres) {
+//							std::cout << v.ending_len <<
+//								"," << std::hex << "0x" << v.features <<
+//								" " << std::dec;
+//						}
+//						std::cout << std::endl;
+//					}
+//					std::cout << std::endl;
+//				}
+//			}
+//		}
 
 	} catch (const std::exception &e) {
 		std::cerr << "Caught exception: " << e.what() << std::endl;

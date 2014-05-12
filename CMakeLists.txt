@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "-g -std=c++0x -W -Wall -Wextra -fstack-protector-all")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 find_package(Boost REQUIRED COMPONENTS system thread locale program_options)
-find_package(elliptics REQUIRED)
+find_package(Elliptics REQUIRED 2.25)
 
 INCLUDE(cmake/locate_library.cmake)
 
@@ -58,6 +58,6 @@ link_directories(
 )
 
 add_subdirectory(lib)
-
+add_subdirectory(processors)
 add_subdirectory(test)
 add_subdirectory(httpserver)

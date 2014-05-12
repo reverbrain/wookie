@@ -47,6 +47,7 @@ struct document {
 
 namespace msgpack
 {
+#ifndef MSGPACK_DNET_TIME_DEFINED
 static inline dnet_time &operator >>(msgpack::object o, dnet_time &tm)
 {
 	if (o.type != msgpack::type::ARRAY || o.via.array.size != 2)
@@ -68,6 +69,7 @@ inline msgpack::packer<Stream> &operator <<(msgpack::packer<Stream> &o, const dn
 
 	return o;
 }
+#endif
 
 static inline ioremap::wookie::document &operator >>(msgpack::object o, ioremap::wookie::document &d)
 {
