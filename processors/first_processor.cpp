@@ -9,7 +9,7 @@ class processor
 {
 public:
 	processor(cocaine::framework::dispatch_t &d) :
-		m_pipeline(d, "first_processor", "last_processor") {
+		m_pipeline(d, "first_processor", "stub_processor") {
 		d.on<process_handler>("process", *this);
 		d.on<update_handler>("update", *this);
 		d.on<echo_handler>("echo", *this);
@@ -23,7 +23,7 @@ public:
 		{
 		}
 
-		void on_request(const meta_info_t &info)
+		void on_request(meta_info_t &&info)
 		{
 			parent().pipeline().push(shared_from_this(), info);
 		}

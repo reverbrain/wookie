@@ -110,7 +110,7 @@ public:
         {
         }
 
-	virtual void on_request(const meta_info_t &info) = 0;
+	virtual void on_request(meta_info_t &&info) = 0;
 
 	void on_chunk(const char *chunk, size_t size)
 	{
