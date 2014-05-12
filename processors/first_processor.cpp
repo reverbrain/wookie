@@ -8,43 +8,24 @@ using namespace ioremap::wookie;
 class processor
 {
 public:
-	processor(cocaine::framework::dispatch_t &d) {
+	processor(cocaine::framework::dispatch_t &d) :
+		m_pipeline(d, "first_processor", "last_processor") {
 		d.on<process_handler>("process", *this);
 		d.on<update_handler>("update", *this);
 		d.on<echo_handler>("echo", *this);
-		m_logger = d.service_manager()->get_system_logger();
-		m_storage = d.service_manager()->get_service<cocaine::framework::storage_service_t>("storage");
-		m_next = d.service_manager()->get_service<processor_t>("last_processor", m_storage);
 	}
 
 	struct process_handler :
-		public cocaine::framework::handler<processor>,
+		public pipeline_process_handler<processor>,
 		public std::enable_shared_from_this<process_handler>
 	{
-		process_handler(processor &calc) : cocaine::framework::handler<processor>(calc)
+		process_handler(processor &parent) : pipeline_process_handler<processor>(parent)
 		{
 		}
 
-		void on_chunk(const char *chunk, size_t size)
+		void on_request(const meta_info_t &info)
 		{
-			auto info = cocaine::framework::unpack<meta_info_t>(chunk, size);
-			auto url = info["url"];
-
-			auto that = shared_from_this();
-			parent().next()->push(url, info).then(
-				[that, url] (cocaine::framework::generator<void> &future) {
-				try {
-					future.next();
-				} catch (std::exception &e) {
-					COCAINE_LOG_ERROR(that->parent().logger(), "Failed to send to next processor, url: %s, error: %s", url, e.what());
-
-					that->response()->error(100, "Failed to send to next processor");
-					return;
-				}
-
-				that->parent().storage()->remove("first_processor", url);
-				that->response()->close();
-			});
+			parent().pipeline().push(shared_from_this(), info);
 		}
 	};
 
@@ -52,13 +33,13 @@ public:
 		public cocaine::framework::http_handler<processor>,
 		public std::enable_shared_from_this<update_handler>
 	{
-		update_handler(processor &calc) : cocaine::framework::http_handler<processor>(calc)
+		update_handler(processor &parent) : cocaine::framework::http_handler<processor>(parent)
 		{
 		}
 
 		void on_request(const cocaine::framework::http_request_t &request)
 		{
-			COCAINE_LOG_ERROR(parent().logger(), "Received request: %s", request.uri());
+			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Received request: %s", request.uri());
 
 			cocaine::framework::http_headers_t headers = request.headers();
 			headers.reset_header("Content-Length", std::to_string(request.uri().size()));
@@ -84,12 +65,12 @@ public:
 			info["body"] = body;
 
 			auto that = shared_from_this();
-			parent().next()->push(url, info).then(
+			parent().pipeline().next()->push(url, info).then(
 				[that, url] (cocaine::framework::generator<void> &future) {
 				try {
 					future.next();
 				} catch (std::exception &e) {
-					COCAINE_LOG_ERROR(that->parent().logger(), "Failed to send to next processor, url: %s, error: %s", url, e.what());
+					COCAINE_LOG_ERROR(that->parent().pipeline().logger(), "Failed to send to next processor, url: %s, error: %s", url, e.what());
 
 					cocaine::framework::http_headers_t headers;
 					headers.add_header("Content-Length", "0");
@@ -127,25 +108,13 @@ public:
 		}
 	};
 
-	const std::shared_ptr<processor_t> &next() const
+	meta_info_pipeline_t &pipeline()
 	{
-		return m_next;
-	}
-
-	const std::shared_ptr<cocaine::framework::storage_service_t> &storage() const
-	{
-		return m_storage;
-	}
-
-	const std::shared_ptr<cocaine::framework::logger_t> &logger() const
-	{
-		return m_logger;
+		return m_pipeline;
 	}
 
 private:
-	std::shared_ptr<processor_t> m_next;
-	std::shared_ptr<cocaine::framework::storage_service_t> m_storage;
-	std::shared_ptr<cocaine::framework::logger_t> m_logger;
+	meta_info_pipeline_t m_pipeline;
 };
 
 int main(int argc, char *argv[])
