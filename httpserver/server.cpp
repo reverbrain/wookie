@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define MSGPACK_DNET_TIME_DEFINED
+
 #include <rift/asio.hpp>
 #include <rift/common.hpp>
 #include <rift/jsonvalue.hpp>
