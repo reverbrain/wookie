@@ -22,7 +22,7 @@ public:
 		void on_request(meta_info_t &&info)
 		{
 			/* Do some magic processing */
-			info["stub"] = "stub-info";
+			info.set_value("stub", std::string("stub-info"));
 
 			/* Send to next processor */
 			parent().pipeline().push(shared_from_this(), info);

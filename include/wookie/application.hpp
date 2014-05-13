@@ -7,7 +7,100 @@
 
 namespace ioremap { namespace wookie {
 
-typedef std::map<std::string, std::string> meta_info_t;
+class meta_info_t
+{
+public:
+	meta_info_t()
+	{
+	}
+
+	meta_info_t(meta_info_t &&other) : m_data(std::move(other.m_data))
+	{
+	}
+
+	meta_info_t &operator =(meta_info_t &&other)
+	{
+		m_data = std::move(other.m_data);
+		return *this;
+	}
+
+	meta_info_t(const meta_info_t &other) = delete;
+	meta_info_t &operator =(const meta_info_t &other) = delete;
+
+	void set_body(const std::string &body)
+	{
+		set_value<std::string>("body", body);
+	}
+
+	std::string body() const
+	{
+		return value<std::string>("body");
+	}
+
+	void set_url(const std::string &url)
+	{
+		set_value<std::string>("url", url);
+	}
+
+	std::string url() const
+	{
+		return value<std::string>("url");
+	}
+
+	template <typename T>
+	void set_value(const std::string &name, const T &value)
+	{
+		msgpack::sbuffer buffer;
+                msgpack::packer<msgpack::sbuffer> packer(buffer);
+
+                cocaine::io::type_traits<T>::pack(packer, value);
+
+		m_data.insert(std::make_pair(name, std::string(buffer.data(), buffer.size())));
+	}
+
+	template <typename T>
+	T value(const std::string &name) const
+	{
+		auto it = m_data.find(name);
+		if (it == m_data.end())
+			return T();
+
+		T result;
+		msgpack::unpacked msg;
+	        msgpack::unpack(&msg, it->second.data(), it->second.size());
+	        cocaine::io::type_traits<T>::unpack(msg.get(), result);
+		return result;
+	}
+
+private:
+	template <typename T>
+	friend struct cocaine::io::type_traits;
+	std::map<std::string, std::string> m_data;
+};
+
+}}
+
+namespace cocaine { namespace io {
+
+template<>
+struct type_traits<ioremap::wookie::meta_info_t> {
+	template<class Stream>
+	static inline
+	void
+	pack(msgpack::packer<Stream> &packer, const ioremap::wookie::meta_info_t &source) {
+		packer << source.m_data;
+	}
+
+	static inline
+	void
+	unpack(const msgpack::object &unpacked, ioremap::wookie::meta_info_t &target) {
+		unpacked >> target.m_data;
+	}
+};
+
+} }
+
+namespace ioremap { namespace wookie {
 
 class processor_t : public cocaine::framework::app_service_t
 {
@@ -66,10 +159,7 @@ public:
 	template <typename T>
 	void push(const T &that, const meta_info_t &info)
 	{
-		std::string url;
-		auto url_it = info.find("url");
-		if (url_it != info.end())
-			url = url_it->second;
+		std::string url = info.url();
 
 		next()->push(url, info).then(
 			[this, that, url] (cocaine::framework::generator<void> &future) {

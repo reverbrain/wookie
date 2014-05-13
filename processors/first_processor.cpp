@@ -61,8 +61,8 @@ public:
 			const std::string &body = request.body();
 
 			meta_info_t info;
-			info["url"] = url;
-			info["body"] = body;
+			info.set_url(url);
+			info.set_body(body);
 
 			auto that = shared_from_this();
 			parent().pipeline().next()->push(url, info).then(
