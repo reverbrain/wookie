@@ -1,33 +1,31 @@
 #include <cocaine/framework/dispatch.hpp>
 #include <wookie/application.hpp>
+#include <wookie/parser.hpp>
 
 using namespace ioremap::wookie;
 
-class processor
+class html_processor
 {
 public:
-	processor(cocaine::framework::dispatch_t &d) :
-		m_pipeline(d, "stub_processor", "last_processor") {
+	html_processor(cocaine::framework::dispatch_t &d) :
+		m_pipeline(d, "html_processor", "feature_extractor") {
 		d.on<process_handler>("process", *this);
 	}
 
 	struct process_handler :
-		public pipeline_process_handler<processor>,
+		public pipeline_process_handler<html_processor>,
 		public std::enable_shared_from_this<process_handler>
 	{
-		process_handler(processor &parent) : pipeline_process_handler<processor>(parent)
+		process_handler(html_processor &parent) : pipeline_process_handler<html_processor>(parent)
 		{
 		}
 
 		void on_request(meta_info_t &&info)
 		{
-			/* Do some magic processing */
-			info.set_value("stub", std::string("stub-info"));
-
-			/* Send to next processor */
+			ioremap::wookie::parser parser;
+			parser.feed_text(info.body());
+			info.set_value("text", parser.text(" "));
 			pipeline().push(shared_from_this(), info);
-
-			/* Yes, that is all, pipeline will close upstream and do all the stuff */
 		}
 	};
 
@@ -42,5 +40,5 @@ private:
 
 int main(int argc, char *argv[])
 {
-	return cocaine::framework::run<processor>(argc, argv);
+	return cocaine::framework::run<html_processor>(argc, argv);
 }
