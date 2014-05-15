@@ -172,16 +172,22 @@ public:
 				return;
 			}
 
-			storage()->remove("first_processor", url).then(
-				[this, that, url] (cocaine::framework::generator<void> &future) {
-				try {
-					future.next();
-				} catch (std::exception &e) {
-					COCAINE_LOG_ERROR(logger(), "Failed to remove itself from the list, url: %s, error: %s", url, e.what());
-				}
+			finish(that);
+		});
+	}
 
-				that->response()->close();
-			});
+	template <typename T>
+	void finish(const T &that)
+	{
+		storage()->remove(m_current, url).then(
+			[this, that, url] (cocaine::framework::generator<void> &future) {
+			try {
+				future.next();
+			} catch (std::exception &e) {
+				COCAINE_LOG_ERROR(logger(), "Failed to remove itself from the list, url: %s, error: %s", url, e.what());
+			}
+
+			that->response()->close();
 		});
 	}
 

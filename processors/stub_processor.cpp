@@ -25,7 +25,7 @@ public:
 			info.set_value("stub", std::string("stub-info"));
 
 			/* Send to next processor */
-			parent().pipeline().push(shared_from_this(), info);
+			pipeline().push(shared_from_this(), info);
 
 			/* Yes, that is all, pipeline will close upstream and do all the stuff */
 		}

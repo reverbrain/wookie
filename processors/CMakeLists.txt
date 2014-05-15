@@ -20,3 +20,8 @@ add_executable(stub_processor stub_processor.cpp)
 target_link_libraries(stub_processor
 	${PROCESSOR_GENERIC_LIBRARIES}
 )
+
+add_executable(last_processor last_processor.cpp)
+target_link_libraries(last_processor
+	${PROCESSOR_GENERIC_LIBRARIES}
+)
