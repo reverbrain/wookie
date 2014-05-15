@@ -172,12 +172,12 @@ public:
 				return;
 			}
 
-			finish(that);
+			finish(that, url);
 		});
 	}
 
 	template <typename T>
-	void finish(const T &that)
+	void finish(const T &that, const std::string &url)
 	{
 		storage()->remove(m_current, url).then(
 			[this, that, url] (cocaine::framework::generator<void> &future) {
