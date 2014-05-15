@@ -49,6 +49,3 @@ int main(int argc, char *argv[])
 {
 	return cocaine::framework::run<feature_extractor>(argc, argv);
 }
-
-
-

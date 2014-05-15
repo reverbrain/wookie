@@ -44,5 +44,3 @@ int main(int argc, char *argv[])
 {
 	return cocaine::framework::run<processor>(argc, argv);
 }
-
-

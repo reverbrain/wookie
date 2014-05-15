@@ -24,7 +24,7 @@ public:
 		{
 			ioremap::wookie::parser parser;
 			parser.feed_text(info.body());
-			info.set_value("text", parser.text());
+			info.set_value("text", parser.text(" "));
 			pipeline().push(shared_from_this(), info);
 		}
 	};
@@ -42,5 +42,3 @@ int main(int argc, char *argv[])
 {
 	return cocaine::framework::run<html_processor>(argc, argv);
 }
-
-
