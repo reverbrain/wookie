@@ -21,6 +21,18 @@ target_link_libraries(stub_processor
 	${PROCESSOR_GENERIC_LIBRARIES}
 )
 
+add_executable(html_processor html_processor.cpp)
+target_link_libraries(html_processor
+	${PROCESSOR_GENERIC_LIBRARIES}
+	${LIBTIDY_LIBRARIES}
+	${LIBMAGIC_LIBRARIES}
+)
+
+add_executable(feature_extractor feature_extractor.cpp)
+target_link_libraries(feature_extractor
+	${PROCESSOR_GENERIC_LIBRARIES}
+)
+
 add_executable(last_processor last_processor.cpp)
 target_link_libraries(last_processor
 	${PROCESSOR_GENERIC_LIBRARIES}

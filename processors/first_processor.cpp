@@ -9,7 +9,7 @@ class processor
 {
 public:
 	processor(cocaine::framework::dispatch_t &d) :
-		m_pipeline(d, "first_processor", "stub_processor") {
+		m_pipeline(d, "first_processor", "html_processor") {
 		d.on<process_handler>("process", *this);
 		d.on<update_handler>("update", *this);
 		d.on<echo_handler>("echo", *this);
