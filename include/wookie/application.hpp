@@ -114,17 +114,17 @@ public:
 	}
 
 	template<class T>
-        cocaine::framework::service_traits<cocaine::io::storage::write>::future_type
-	push(const std::string& event, const T& chunk) {
-            msgpack::sbuffer buffer;
-            msgpack::packer<msgpack::sbuffer> packer(buffer);
+	cocaine::framework::service_traits<cocaine::io::storage::write>::future_type
+	push(const std::string& url, const T& chunk) {
+		msgpack::sbuffer buffer;
+		msgpack::packer<msgpack::sbuffer> packer(buffer);
 
-            cocaine::io::type_traits<T>::pack(packer, chunk);
+		cocaine::io::type_traits<T>::pack(packer, chunk);
 
-	    auto result = m_storage->write(this->name(), event, cocaine::io::literal { buffer.data(), buffer.size() });
-	    call<cocaine::io::app::enqueue>(event, cocaine::io::literal { buffer.data(), buffer.size() });
-	    return result;
-        }
+		auto result = m_storage->write(this->name(), url, cocaine::io::literal { buffer.data(), buffer.size() });
+		call<cocaine::io::app::enqueue>("process", cocaine::io::literal { buffer.data(), buffer.size() });
+		return result;
+ 	}
 
 private:
 	std::shared_ptr<cocaine::framework::storage_service_t> m_storage;
@@ -138,7 +138,11 @@ public:
 		m_current = current;
 		m_logger = d.service_manager()->get_system_logger();
 		m_storage = d.service_manager()->get_service<cocaine::framework::storage_service_t>("storage");
-		m_next = d.service_manager()->get_service<processor_t>(next, m_storage);
+
+		// Last processor in pipeline won't have next processor
+		if (!next.empty()) {
+			m_next = d.service_manager()->get_service<processor_t>(next, m_storage);
+		}
 	}
 
 	const std::shared_ptr<processor_t> &next() const
