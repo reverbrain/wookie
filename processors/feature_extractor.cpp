@@ -21,6 +21,8 @@ public:
 
 		void on_request(meta_info_t &&info)
 		{
+			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Extracting features from page: %s", info.url());
+
 			std::stringstream ss(info.value<std::string>("text"));
 			std::unordered_map<std::string, size_t> terms_frequencies;
 			std::string word;

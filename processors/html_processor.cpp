@@ -22,6 +22,8 @@ public:
 
 		void on_request(meta_info_t &&info)
 		{
+			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Processing html from page: %s", info.url());
+
 			ioremap::wookie::parser parser;
 			parser.feed_text(info.body());
 			info.set_value("text", parser.text(" "));
