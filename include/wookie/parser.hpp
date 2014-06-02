@@ -232,7 +232,9 @@ class parser {
 			for (child = tidyGetChild(tnode); child; child = tidyGetNext(child)) {
 				if (tidyNodeGetId(child) == TidyTag_A) {
 					TidyAttr href = tidyAttrGetHREF(child);
-					m_urls.push_back(convert(tidyAttrValue(href)));
+					if (tidyAttrValue(href)) {
+						m_urls.push_back(convert(tidyAttrValue(href)));
+					}
 				}
 
 				if (tidyNodeIsSCRIPT(child) || tidyNodeIsSTYLE(child)) {
