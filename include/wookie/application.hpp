@@ -195,6 +195,20 @@ public:
 		});
 	}
 
+	template <typename T>
+	void restore_states(const T &that)
+	{
+		storage()->find(m_current, std::vector<std::string>(1, "documents")).then([this, that] (cocaine::framework::generator<std::vector<std::string>> &future) {
+			try {
+				for (const std::string &url : future.next()) {
+					that->process(url);
+				}
+			} catch (std::exception &e) {
+				COCAINE_LOG_ERROR(logger(), "Failed to retrieve the list of actions to restore, error: %s", e.what());
+			}
+		});
+	}
+
 private:
 	std::string m_current;
 	std::shared_ptr<processor_t> m_next;
