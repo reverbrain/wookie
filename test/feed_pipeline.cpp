@@ -24,24 +24,58 @@ using namespace ioremap;
 using namespace ioremap::wookie;
 namespace cf = cocaine::framework;
 
+/*!
+ * Create object for accessing cocaine service "first_processor" for pushing documents
+ * "first_processor" receives documents and pushes them along pipeline
+ */
 auto manager = cf::service_manager_t::create(cf::service_manager_t::endpoint_t("127.0.0.1", 10053));
 auto app = manager->get_service<cf::app_service_t>("first_processor");
 
+/*!
+ * \brief Processor that will send downloaded documents into pipeline
+ */
 struct feed_pipeline_processor
 {
+	/*!
+	 * \brief Engine that is responsible for url crawling and feeding
+	 */
 	wookie::engine &engine;
+	/*!
+	 * \brief Base domain for crawling
+	 */
 	std::string base;
+	/*!
+	 * \brief Type of processor
+	 * If fallback is set it means that something went wrong and now we
+	 * are in recovering state
+	 */
 	bool fallback;
 
 	feed_pipeline_processor(wookie::engine &engine, const std::string &base, bool fallback)
 		: engine(engine), base(base), fallback(fallback) {
 	}
 
+	/*!
+	 * \brief Called on every downloaded document
+	 * \param reply Swarm reply about downloaded document
+	 * \param data Content of the document
+	 */
 	void process_text(const ioremap::swarm::url_fetcher::response &reply, const std::string &data, document_type) {
+		if (fallback) {
+			return;
+		}
+
 		try {
+			/*!
+			 * Create meta information about downloaded document and send it into pipeline
+			 * meta information consists of document url and document body
+			 */
 			wookie::meta_info_t meta_info;
 			meta_info.set_url(reply.url().to_string());
 			meta_info.set_body(data);
+			/*!
+			 * Call "process" function of "first_processor" sends document into pipeline
+			 */
 			auto g = app->enqueue("process", meta_info);
 		} catch (const std::exception &e) {
 			std::cerr << reply.url().to_string() << ": feed pipeline exception: " << e.what() << std::endl;
@@ -49,6 +83,13 @@ struct feed_pipeline_processor
 		}
 	}
 
+	/*!
+	 * \brief Creates process functor that will be called on every downloaded document
+	 * \param engine Wookie engine that will be used for downloading in processor
+	 * \param url Base domain url
+	 * \param fallback If fallback is set then function will create functor for processing failures
+	 * \return returns process functor
+	 */
 	static process_functor create(wookie::engine &engine, const std::string &url, bool fallback) {
 		ioremap::swarm::url base_url = url;
 		if (!base_url.is_valid())
@@ -66,6 +107,11 @@ struct feed_pipeline_processor
 	}
 };
 
+/*!
+ * \brief Creates filter for urls. All urls with forbidden_words will be ignored by crawler.
+ * \param forbidden_words List of forbidden words in url
+ * \return Returns functor for filtering urls
+ */
 url_filter_functor create_words_filter(const std::vector<std::string> &forbidden_words)
 {
 	struct filter
@@ -120,21 +166,61 @@ int main(int argc, char *argv[])
 	}
 
 	try {
+		/*!
+		 * Crawled will only download pages with this ports
+		 */
 		std::vector<int> allowed_ports = { 80, 8080 };
 
+		/*!
+		 * \brief List of forbidden words in urls. Crawler will skip all url containing any of this words.
+		 */
 		std::vector<std::string> forbidden_words;
 		forbidden_words.push_back("/blog");
 
+		/*!
+		 * Filter that distinguishes text and images/audio/binary files
+		 * Filters out everything but text
+		 */
 		engine.add_filter(create_text_filter());
+
+		/*!
+		 * Filter for crawling urls only in the same domain as \a url
+		 */
 		engine.add_url_filter(create_domain_filter(url));
+
+		/*!
+		 * Filters out urls with forbidden words
+		 */
 		engine.add_url_filter(create_words_filter(forbidden_words));
+
+		/*!
+		 * Filters out urls on bad ports
+		 */
 		engine.add_url_filter(create_port_filter(allowed_ports));
+
+		/*!
+		 * Specifies strategy by which urls are extracted from document body
+		 */
 		engine.add_parser(create_href_parser());
+
+		/*!
+		 * Sets basic processor that will be called on each downloaded document
+		 */
 		engine.add_processor(feed_pipeline_processor::create(engine, url, false));
+
+		/*!
+		 * Sets processor that will be called on documents not accepted by filters
+		 */
 		engine.add_fallback_processor(feed_pipeline_processor::create(engine, url, true));
 
+		/*!
+		 * Adds start \a url into download list of engine
+		 */
 		engine.download(url);
 
+		/*!
+		 * Starts engine download loop
+		 */
 		return engine.run();
 	} catch (const std::exception &e) {
 		std::cerr << "main thread exception: " << e.what() << std::endl;
