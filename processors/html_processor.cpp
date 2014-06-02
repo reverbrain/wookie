@@ -4,6 +4,11 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief Extracts text out of document body
+ * Takes document body as an input and extracts human readable text out of it
+ * - Fills field "text" with parsed document body text
+ */
 class html_processor
 {
 public:
@@ -24,8 +29,15 @@ public:
 		{
 			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Processing html from page: %s", info.url());
 
+			/*!
+			 * Parse document body using standard wookie parser
+			 */
 			ioremap::wookie::parser parser;
 			parser.feed_text(info.body());
+
+			/*!
+			 * Put parsed document text into field "text" in meta information
+			 */
 			info.set_value("text", parser.text(" "));
 			pipeline().push(shared_from_this(), info);
 		}

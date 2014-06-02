@@ -3,6 +3,10 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief Example of simple processor that takes document meta_info, sets field "stub" in it and
+ * passes it along the pipeline.
+ */
 class processor
 {
 public:
@@ -19,6 +23,10 @@ public:
 		{
 		}
 
+		/*!
+		 * \brief This method will be called to handle "process" event.
+		 * \param info document meta information that is passed along the pipeline
+		 */
 		void on_request(meta_info_t &&info)
 		{
 			/* Do some magic processing */

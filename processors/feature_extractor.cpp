@@ -3,6 +3,11 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief Extracts features from document text
+ * Takes document text as an input and calculates textual features
+ * - Calculates terms frequencies in the document and puts them into "terms_frequencies" field in meta information
+ */
 class feature_extractor
 {
 public:
@@ -23,6 +28,9 @@ public:
 		{
 			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Extracting features from page: %s", info.url());
 
+			/*!
+			 * Calculate frequency of each word in current document
+			 */
 			std::stringstream ss(info.value<std::string>("text"));
 			std::unordered_map<std::string, size_t> terms_frequencies;
 			std::string word;
@@ -30,9 +38,16 @@ public:
 				++terms_frequencies[word];
 			}
 
+			/*!
+			 * Convert map into vector of pairs <word, frequency>
+			 */
 			std::vector<std::pair<std::string, size_t>> terms_frequencies_vector(
 				terms_frequencies.begin(), terms_frequencies.end()
 			);
+
+			/*!
+			 * Save terms frequencies in document meta information
+			 */
 			info.set_value("terms_frequencies", terms_frequencies_vector);
 			pipeline().push(shared_from_this(), info);
 		}
