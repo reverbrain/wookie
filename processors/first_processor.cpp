@@ -5,16 +5,28 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief First processor in the pipeline
+ * This processor starts the pipeline. In order to add document to pipeline you
+ * can push it into application "first_processor".
+ * Essentially, it can handle requests from native proxy via "update" method.
+ * Also, it can be used from cocaine framework via "process" handle.
+ * After receiving document it will push it into next application in pipeline.
+ */
 class processor
 {
 public:
 	processor(cocaine::framework::dispatch_t &d) :
-		m_pipeline(d, "first_processor", "stub_processor") {
+		m_pipeline(d, "first_processor", "html_processor") {
 		d.on<process_handler>("process", *this);
 		d.on<update_handler>("update", *this);
 		d.on<echo_handler>("echo", *this);
 	}
 
+	/*!
+	 * \brief Processor that handles "process" requests.
+	 * Just sends passed meta_info_t info next pipeline application
+	 */
 	struct process_handler :
 		public pipeline_process_handler<processor>,
 		public std::enable_shared_from_this<process_handler>
@@ -84,27 +96,6 @@ public:
 				that->response()->write_headers(200, headers);
 				that->response()->close();
 			});
-		}
-	};
-
-	struct echo_handler :
-		public cocaine::framework::handler<processor>,
-		public std::enable_shared_from_this<echo_handler>
-	{
-		echo_handler(processor &calc) : cocaine::framework::handler<processor>(calc)
-		{
-		}
-
-		void on_chunk(const char *chunk, size_t size)
-		{
-			cocaine::framework::http_request_t request = cocaine::framework::unpack<cocaine::framework::http_request_t>(chunk, size);
-			int code = 200;
-			cocaine::framework::http_headers_t headers = request.headers();
-			headers.reset_header("content-length", std::to_string(request.uri().size()));
-
-			response()->write(std::make_tuple(code, headers));
-			response()->write(request.uri());
-			response()->close();
 		}
 	};
 

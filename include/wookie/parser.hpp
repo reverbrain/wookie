@@ -230,10 +230,11 @@ class parser {
 			TidyNode child;
 
 			for (child = tidyGetChild(tnode); child; child = tidyGetNext(child)) {
-				TidyAttr href;
-				if (tidyNodeIsLINK(child)) {
-					href = tidyAttrGetHREF(child);
-					m_urls.push_back(convert(tidyAttrValue(href)));
+				if (tidyNodeGetId(child) == TidyTag_A) {
+					TidyAttr href = tidyAttrGetHREF(child);
+					if (tidyAttrValue(href)) {
+						m_urls.push_back(convert(tidyAttrValue(href)));
+					}
 				}
 
 				if (tidyNodeIsSCRIPT(child) || tidyNodeIsSTYLE(child)) {

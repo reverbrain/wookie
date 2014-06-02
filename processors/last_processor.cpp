@@ -3,11 +3,16 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief Finalizes processing of the document in pipeline
+ * This is the last application in pipeline. It's intended to save calculated document
+ * meta information in storage
+ */
 class processor
 {
 public:
 	processor(cocaine::framework::dispatch_t &d) :
-		m_pipeline(d, "stub_processor", "") {
+		m_pipeline(d, "feature_extractor", "") {
 		d.on<process_handler>("process", *this);
 	}
 
@@ -21,10 +26,9 @@ public:
 
 		void on_request(meta_info_t &&info)
 		{
-			/* Do some magic processing */
-			info.set_value("stub", std::string("stub-info"));
+			COCAINE_LOG_ERROR(parent().pipeline().logger(), "Finishing processing page: %s", info.url());
 
-			/* Send to next processor */
+			/* Finish processing */
 			pipeline().finish(shared_from_this(), info.url());
 
 			/* Yes, that is all, pipeline will close upstream and do all the stuff */

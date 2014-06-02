@@ -43,4 +43,22 @@ target_link_libraries(wookie_encoding
 	${Boost_LIBRARIES}
 )
 
+
+LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
+
+find_package(CocaineNative REQUIRED)
+include_directories(${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
+
+add_executable(wookie_feed_pipeline feed_pipeline.cpp)
+target_link_libraries(wookie_feed_pipeline
+	wookie
+	${Boost_LIBRARIES}
+	${MSGPACK_LIBRARIES}
+	${SWARM_LIBRARIES}
+	${SWARM_URLFETCHER_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
+	${CocaineNative_LIBRARIES}
+	${LIBEV_LIBRARIES}
+)
+
 add_subdirectory(similarity)

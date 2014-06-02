@@ -28,7 +28,7 @@ namespace ioremap { namespace wookie {
 
 class storage {
 	public:
-		explicit storage(const elliptics::session &sess);
+		explicit storage(elliptics::node &&node);
 
 		void set_groups(const std::vector<int> groups);
         	void set_namespace(const std::string &ns);
@@ -51,6 +51,7 @@ class storage {
 		elliptics::node get_node();
 
 	private:
+		elliptics::node m_node;
 		elliptics::session m_sess;
 		wookie::split m_spl;
 };
