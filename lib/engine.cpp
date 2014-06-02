@@ -426,9 +426,7 @@ int engine::parse_command_line(int argc, char **argv, boost::program_options::va
 	}
 
 	elliptics::file_logger log(log_file.c_str(), log_level);
-	elliptics::node node(log);
-	elliptics::session sess(node);
-	m_data->storage.reset(new wookie::storage(sess));
+	m_data->storage.reset(new wookie::storage(elliptics::node(log)));
 
 	if (ns.size())
 		m_data->storage->set_namespace(ns);

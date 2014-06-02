@@ -53,6 +53,7 @@ struct rindex_processor
 		if (ids.size()) {
 			std::cout << "Rindex update ... url: " << url << ": indexes: " << ids.size() << std::endl;
 			engine.get_storage()->create_session().set_indexes(url, ids, objs).wait();
+			std::cout << "Rindex update finished" << std::endl;
 		}
 
 		document doc;
@@ -69,6 +70,7 @@ struct rindex_processor
 		sess.set_namespace(ns.c_str(), ns.size());
 
 		sess.write_data(doc.key, ptr, 0).wait();
+		std::cout << "RIndex process finished" << std::endl;
 	}
 
 	void process_text(const ioremap::swarm::url_fetcher::response &reply, const std::string &data, document_type) {

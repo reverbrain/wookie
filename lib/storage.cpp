@@ -18,7 +18,7 @@
 
 namespace ioremap { namespace wookie {
 
-storage::storage(const elliptics::session &sess) : m_sess(sess.clone()) {
+storage::storage(elliptics::node &&node) : m_node(node), m_sess(m_node) {
 	m_sess.set_exceptions_policy(elliptics::session::no_exceptions);
 	m_sess.set_ioflags(DNET_IO_FLAGS_CACHE);
 	m_sess.set_timeout(1000);
