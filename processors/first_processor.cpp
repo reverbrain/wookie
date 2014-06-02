@@ -41,6 +41,13 @@ public:
 		}
 	};
 
+	/*!
+	 * \brief The update_handler struct makes possible to upload single document to pipeline
+	 *
+	 * To upload document to pipeline send POST request to url:
+	 * http://proxy/first_processor/update?url=original_url
+	 * with document's body as data.
+	 */
 	struct update_handler :
 		public cocaine::framework::http_handler<processor>,
 		public std::enable_shared_from_this<update_handler>
