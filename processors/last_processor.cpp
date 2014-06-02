@@ -3,6 +3,11 @@
 
 using namespace ioremap::wookie;
 
+/*!
+ * \brief Finalizes processing of the document in pipeline
+ * This is the last application in pipeline. It's intended to save calculated document
+ * meta information in storage
+ */
 class processor
 {
 public:
