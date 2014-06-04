@@ -1,6 +1,7 @@
 #ifndef APPLICATION_HPP
 #define APPLICATION_HPP
 
+#include <grape/elliptics_client_state.hpp>
 #include <cocaine/framework/dispatch.hpp>
 #include <cocaine/framework/services/app.hpp>
 #include <cocaine/framework/services/storage.hpp>
@@ -132,58 +133,9 @@ struct type_traits<ioremap::wookie::meta_info_t> {
 namespace ioremap { namespace wookie {
 
 /*!
- * \brief The processor_t class provides API to push meta_info_t to next application in pipeline
- */
-class processor_t : public cocaine::framework::app_service_t
-{
-public:
-	typedef typename cocaine::framework::service_traits<cocaine::io::app::enqueue>::future_type enqueue_generator;
-
-	processor_t(std::shared_ptr<cocaine::framework::service_connection_t> connection,
-		const std::shared_ptr<cocaine::framework::storage_service_t> &storage) :
-		app_service_t(connection), m_storage(storage), m_tags(1, "documents")
-	{
-	}
-
-	/*!
-	 * \brief Sends \a chunk to next processor
-	 *
-	 * In addition it writes data to secondary index of next application, so it may be
-	 * restored after failure without data loose
-	 */
-	template<class T>
-	cocaine::framework::service_traits<cocaine::io::storage::write>::future_type
-	push(const std::string& url, const T& chunk) {
-		msgpack::sbuffer buffer;
-		msgpack::packer<msgpack::sbuffer> packer(buffer);
-
-		cocaine::io::type_traits<T>::pack(packer, chunk);
-
-		cocaine::io::literal data = { buffer.data(), buffer.size() };
-
-		auto result = m_storage->write(this->name(), url, data, m_tags);
-		push_raw(data);
-		return result;
- 	}
-
-	/*!
-	 * \internal
-	 * \brief Pushes data to next worker without adding url to secondary index
-	 */
-	cocaine::framework::service_traits<cocaine::io::app::enqueue>::future_type
-	push_raw(const cocaine::io::literal &chunk) {
-		return call<cocaine::io::app::enqueue>("process", chunk);
- 	}
-
-private:
-	std::shared_ptr<cocaine::framework::storage_service_t> m_storage;
-	std::vector<std::string> m_tags;
-};
-
-/*!
  * \brief The meta_info_pipeline_t class provides common API for working with pipeline
  *
- * It makes connections to logger and storage in addition to next application in pipeline
+ * It makes connections to logger and queue of current and next applications in pipeline
  */
 class meta_info_pipeline_t
 {
@@ -193,20 +145,31 @@ public:
 	 */
 	meta_info_pipeline_t(cocaine::framework::dispatch_t &d, const std::string &current, const std::string &next) : m_tags(1, "documents")
 	{
-		m_current = current;
+		(void) current;
+		(void) next;
+
+		rapidjson::Document doc;
+		m_state = elliptics_client_state::create("config.json", doc);
+
+		if (doc.HasMember("next")) {
+			rapidjson::Value &next = doc["next"];
+			if (next.IsString()) {
+				m_next_name.assign(next.GetString(), next.GetString() + next.GetStringLength());
+				m_next_name += "-queue@push";
+			}
+		}
+
+		if (!doc.HasMember("current") || !doc["current"].IsString()) {
+			throw std::runtime_error("Field 'current' is missed or is not a string");
+		}
+		m_current_name = doc["current"].GetString();
+		m_current_name += "-queue@ack";
 		m_logger = d.service_manager()->get_system_logger();
 		m_storage = d.service_manager()->get_service<cocaine::framework::storage_service_t>("storage");
-
-		// Last processor in pipeline won't have next processor
-		if (!next.empty()) {
-			m_next = d.service_manager()->get_service<processor_t>(next, m_storage);
-		}
 	}
 
-	const std::shared_ptr<processor_t> &next() const
-	{
-		return m_next;
-	}
+	meta_info_pipeline_t(const meta_info_pipeline_t &) = delete;
+	meta_info_pipeline_t &operator =(const meta_info_pipeline_t &) = delete;
 
 	const std::shared_ptr<cocaine::framework::storage_service_t> &storage() const
 	{
@@ -216,6 +179,18 @@ public:
 	const std::shared_ptr<cocaine::framework::logger_t> &logger() const
 	{
 		return m_logger;
+	}
+
+	template <typename Method>
+	void push(const std::string &url, const meta_info_t &info, Method method)
+	{
+		push_internal(url, info).connect([this, url, method] (const elliptics::sync_exec_result &, const elliptics::error_info &error) {
+			if (error) {
+				COCAINE_LOG_ERROR(logger(), "Failed to send to next processor, url: %s, error: %s", url, error.message());
+			}
+
+			method(!error);
+		});
 	}
 
 	/*!
@@ -229,16 +204,13 @@ public:
 	template <typename T>
 	void push(const T &that, const meta_info_t &info)
 	{
-		std::string url = info.url();
+		const std::string url = info.url();
 
-		next()->push(url, info).then(
-			[this, that, url] (cocaine::framework::generator<void> &future) {
-			try {
-				future.next();
-			} catch (std::exception &e) {
-				COCAINE_LOG_ERROR(logger(), "Failed to send to next processor, url: %s, error: %s", url, e.what());
+		push_internal(url, info).connect([this, that, url] (const elliptics::sync_exec_result &, const elliptics::error_info &error) {
+			if (error) {
+				COCAINE_LOG_ERROR(logger(), "Failed to sent to next processor, url: %s, error: %s", url, error.message());
 
-				that->response()->error(100, "Failed to send to next processor");
+				that->response()->error(100, "Failed to sent to next processor");
 				return;
 			}
 
@@ -247,7 +219,7 @@ public:
 	}
 
 	/*!
-	 * \brief Removes \a url from this application's seconday index, \a that is shared pointer to your application
+	 * \brief Removes \a url from this application's queue, \a that is shared pointer to your application
 	 *
 	 * Sends reply to reply_stream.
 	 *
@@ -258,39 +230,49 @@ public:
 	template <typename T>
 	void finish(const T &that, const std::string &url)
 	{
-		storage()->remove(m_current, url).then(
-			[this, that, url] (cocaine::framework::generator<void> &future) {
-			try {
-				future.next();
-			} catch (std::exception &e) {
-				COCAINE_LOG_ERROR(logger(), "Failed to remove itself from the list, url: %s, error: %s", url, e.what());
-			}
-
-			that->response()->write(cocaine::io::literal { "ok", 2 });
-			that->response()->close();
-		});
-	}
-
-	/*!
-	 * \internal
-	 */
-	template <typename T>
-	void restore_states(const T &that)
-	{
-		storage()->find(m_current, m_tags).then([this, that] (cocaine::framework::generator<std::vector<std::string>> &future) {
-			try {
-				for (const std::string &url : future.next()) {
-					that->process(url);
-				}
-			} catch (std::exception &e) {
-				COCAINE_LOG_ERROR(logger(), "Failed to retrieve the list of actions to restore, error: %s", e.what());
+		elliptics::session sess = m_state.create_session();
+		sess.exec(that->context(), m_current_name, elliptics::data_pointer()).connect(
+			[this, url, that] (const elliptics::sync_exec_result &, const elliptics::error_info &error) {
+			if (error) {
+				COCAINE_LOG_ERROR(logger(), "Failed to sent to next processor, url: %s, error: %s", url, error.message());
 			}
 		});
+
+		that->response()->write(cocaine::io::literal { "ok", 2 });
+		that->response()->close();
 	}
 
 private:
-	std::string m_current;
-	std::shared_ptr<processor_t> m_next;
+	elliptics::async_exec_result exec(const std::string &url, const std::string &event, const elliptics::argument_data &data)
+	{
+		elliptics::session sess = m_state.create_session();
+		elliptics::key id = url;
+		sess.transform(id);
+		dnet_id tmp_id = id.id();
+
+		return sess.exec(&tmp_id, event, data);
+	}
+
+	elliptics::async_exec_result push_internal(const std::string &url, const meta_info_t &info)
+	{
+		msgpack::sbuffer buffer;
+		msgpack::packer<msgpack::sbuffer> packer(buffer);
+		cocaine::io::type_traits<meta_info_t>::pack(packer, info);
+
+		COCAINE_LOG_INFO(logger(), "Send to next processor, url: %s, event: %s", url, m_next_name);
+
+		elliptics::session sess = m_state.create_session();
+		elliptics::key id = url;
+		sess.transform(id);
+		dnet_id tmp_id = id.id();
+
+		auto data = elliptics::data_pointer::from_raw(buffer.data(), buffer.size());
+		return sess.exec(&tmp_id, m_next_name, data);
+	}
+
+	elliptics_client_state m_state;
+	std::string m_current_name;
+	std::string m_next_name;
 	std::shared_ptr<cocaine::framework::storage_service_t> m_storage;
 	std::shared_ptr<cocaine::framework::logger_t> m_logger;
 	std::vector<std::string> m_tags;
@@ -308,7 +290,18 @@ public:
 
 	void on_chunk(const char *chunk, size_t size)
 	{
-		on_request(cocaine::framework::unpack<meta_info_t>(chunk, size));
+		elliptics::error_info error;
+		m_context = elliptics::exec_context::parse(elliptics::data_pointer::copy(chunk, size), &error);
+		if (error) {
+			error.throw_error();
+		}
+
+		const auto data = m_context.data();
+
+		COCAINE_LOG_INFO(this->parent().pipeline().logger(), "on_chunk: %s, data size: %ull",
+			m_context.event(), static_cast<unsigned long long>(data.size()));
+
+		on_request(cocaine::framework::unpack<meta_info_t>(data.data<char>(), data.size()));
 	}
 
 	meta_info_pipeline_t &pipeline()
@@ -316,8 +309,14 @@ public:
 		return m_pipeline;
 	}
 
+	const elliptics::exec_context &context() const
+	{
+		return m_context;
+	}
+
 protected:
-	meta_info_pipeline_t m_pipeline;
+	meta_info_pipeline_t &m_pipeline;
+	elliptics::exec_context m_context;
 };
 
 }} // namespace ioremap::wookie

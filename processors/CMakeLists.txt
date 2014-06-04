@@ -1,13 +1,14 @@
 LOCATE_LIBRARY(LIBEV "ev++.h" "ev" "libev")
 
 find_package(CocaineNative REQUIRED)
-include_directories(${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS})
+include_directories(${CocaineNative_INCLUDE_DIRS} ${LIBEV_INCLUDE_DIRS} ${ELLIPTICS_INCLUDE_DIRS})
 
 set(PROCESSOR_GENERIC_LIBRARIES
 	${Boost_LIBRARIES}
 	${MSGPACK_LIBRARIES}
 	${CocaineNative_LIBRARIES}
 	${LIBEV_LIBRARIES}
+	${ELLIPTICS_LIBRARIES}
 )
 
 add_executable(recovery recovery.cpp)

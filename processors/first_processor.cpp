@@ -84,23 +84,11 @@ public:
 			info.set_body(body);
 
 			auto that = shared_from_this();
-			parent().pipeline().next()->push(url, info).then(
-				[that, url] (cocaine::framework::generator<void> &future) {
-				try {
-					future.next();
-				} catch (std::exception &e) {
-					COCAINE_LOG_ERROR(that->parent().pipeline().logger(), "Failed to send to next processor, url: %s, error: %s", url, e.what());
-
-					cocaine::framework::http_headers_t headers;
-					headers.add_header("Content-Length", "0");
-					that->response()->write_headers(500, headers);
-					that->response()->close();
-					return;
-				}
-
+			auto &x = parent().pipeline();
+			x.push(url, info, [that, url] (bool ok) {
 				cocaine::framework::http_headers_t headers;
 				headers.add_header("Content-Length", "0");
-				that->response()->write_headers(200, headers);
+				that->response()->write_headers(ok ? 200 : 505, headers);
 				that->response()->close();
 			});
 		}
