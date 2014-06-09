@@ -11,12 +11,6 @@ set(PROCESSOR_GENERIC_LIBRARIES
 	${ELLIPTICS_LIBRARIES}
 )
 
-add_executable(recovery recovery.cpp)
-target_link_libraries(recovery
-	${PROCESSOR_GENERIC_LIBRARIES}
-	${SWARM_LIBRARIES}
-)
-
 add_executable(first_processor first_processor.cpp)
 target_link_libraries(first_processor
 	${PROCESSOR_GENERIC_LIBRARIES}

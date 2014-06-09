@@ -20,7 +20,6 @@ public:
 		m_pipeline(d, "first_processor", "html_processor") {
 		d.on<process_handler>("process", *this);
 		d.on<update_handler>("update", *this);
-		d.on<echo_handler>("echo", *this);
 	}
 
 	/*!

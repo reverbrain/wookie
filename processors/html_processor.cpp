@@ -38,7 +38,7 @@ public:
 			/*!
 			 * Put parsed document text into field "text" in meta information
 			 */
-			info.set_value("text", parser.text(" "));
+			info.set_value("text", parser.tokens());
 			pipeline().push(shared_from_this(), info);
 		}
 	};

@@ -31,10 +31,8 @@ public:
 			/*!
 			 * Calculate frequency of each word in current document
 			 */
-			std::stringstream ss(info.value<std::string>("text"));
 			std::unordered_map<std::string, size_t> terms_frequencies;
-			std::string word;
-			while (ss >> word) {
+			for (const auto &word : info.value<std::vector<std::string>>("text")) {
 				++terms_frequencies[word];
 			}
 
